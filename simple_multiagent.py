@@ -13,18 +13,8 @@ class SimpleMultiAgent:
     
     def _init_llms(self):
         """Initialize LLMs separately to avoid recursion"""
-        try:
-            from agents.config import Config
-            if Config.GOOGLE_API_KEY and Config.GOOGLE_API_KEY != "your_google_api_key_here":
-                from langchain_google_genai import ChatGoogleGenerativeAI
-                self.gemini_llm = ChatGoogleGenerativeAI(
-                    model="gemini-1.5-flash",
-                    google_api_key=Config.GOOGLE_API_KEY,
-                    temperature=0.3
-                )
-                print("[OK] Gemini initialized")
-        except Exception as e:
-            print(f"[WARN] Gemini failed: {e}")
+        # Gemini disabled - all models return 404
+        print("[INFO] Gemini disabled (404 errors)")
         
         try:
             from agents.config import Config
@@ -71,14 +61,22 @@ class SimpleMultiAgent:
             'reasons': reasons
         }
         
-        # Agent 2: Intelligence (VirusTotal - optional, skip if fails)
-        intelligence = {'threat_score': 0, 'is_known_malware': False}
+        # Agent 2: Intelligence (VirusTotal + Behavior - optional, skip if fails)
+        intelligence = {'threat_score': 0, 'is_known_malware': False, 'behaviors': []}
         if is_suspicious:
             self.log_message("System", "IntelligenceAgent", "Checking threat intelligence")
             try:
-                # Simplified VirusTotal check with timeout
-                intelligence = self._check_virustotal(path, timeout=2)
-                self.log_message("IntelligenceAgent", "System", f"VT score: {intelligence.get('threat_score', 0)}/10")
+                # VirusTotal hash check
+                vt_result = self._check_virustotal(path, timeout=2)
+                intelligence.update(vt_result)
+                self.log_message("IntelligenceAgent", "System", f"VT score: {vt_result.get('threat_score', 0)}/10")
+                
+                # Behavioral analysis
+                behavior = self._analyze_behavior(pid, proc_name, path, cmdline)
+                intelligence['behaviors'] = behavior['behaviors']
+                intelligence['behavior_score'] = behavior['behavior_threat_score']
+                if behavior['behaviors']:
+                    self.log_message("IntelligenceAgent", "System", f"Behaviors: {len(behavior['behaviors'])} detected")
             except:
                 self.log_message("IntelligenceAgent", "System", "Skipped (timeout/error)")
         
@@ -109,32 +107,76 @@ class SimpleMultiAgent:
     def _calculate_threat_level(self, proc_name: str, path: str, cmdline: str) -> int:
         """Calculate threat level (0-10)"""
         score = 0
+        proc_lower = proc_name.lower()
+        path_lower = path.lower()
+        cmd_lower = cmdline.lower()
         
-        if "temp" in path.lower(): score += 3
-        if "downloads" in path.lower(): score += 2
-        if proc_name.lower() in ["encryptor.exe", "locker.exe", "crypt.exe", "ransomware.exe"]: score += 8
-        if proc_name.lower() in ["keylogger.exe", "stealer.exe"]: score += 7
-        if "suspicious" in proc_name.lower(): score += 5
-        if "powershell" in proc_name.lower() and "-enc" in cmdline.lower(): score += 6
+        # Location-based
+        if "temp" in path_lower: score += 3
+        if "downloads" in path_lower: score += 2
+        if "appdata\\roaming" in path_lower: score += 2
+        
+        # Ransomware indicators
+        if proc_lower in ["encryptor.exe", "locker.exe", "crypt.exe", "ransomware.exe"]: score += 8
+        
+        # Spyware/Keylogger indicators
+        if proc_lower in ["keylogger.exe", "stealer.exe", "logger.exe"]: score += 7
+        
+        # RAT (Remote Access Trojan) indicators
+        rat_names = ["rat.exe", "njrat.exe", "darkcomet.exe", "cybergate.exe", 
+                     "poison.exe", "blackshades.exe", "remcos.exe", "asyncrat.exe"]
+        if proc_lower in rat_names: score += 9
+        
+        # Generic suspicious patterns
+        if "suspicious" in proc_lower: score += 5
+        if "hack" in proc_lower or "crack" in proc_lower: score += 6
+        if "backdoor" in proc_lower or "trojan" in proc_lower: score += 8
+        
+        # Command line indicators
+        if "powershell" in proc_lower and "-enc" in cmd_lower: score += 6
+        if "cmd" in proc_lower and ("&" in cmd_lower or "|" in cmd_lower): score += 3
         
         return min(score, 10)
     
     def _get_threat_reasons(self, proc_name: str, path: str, cmdline: str) -> list:
         """Get list of threat reasons"""
         reasons = []
+        proc_lower = proc_name.lower()
+        path_lower = path.lower()
+        cmd_lower = cmdline.lower()
         
-        if "temp" in path.lower():
+        # Location checks
+        if "temp" in path_lower:
             reasons.append("Launched from temp directory")
-        if "downloads" in path.lower():
+        if "downloads" in path_lower:
             reasons.append("Launched from downloads")
-        if proc_name.lower() in ["encryptor.exe", "locker.exe", "crypt.exe", "ransomware.exe"]:
+        if "appdata\\roaming" in path_lower:
+            reasons.append("Launched from AppData\\Roaming")
+        
+        # Malware type detection
+        if proc_lower in ["encryptor.exe", "locker.exe", "crypt.exe", "ransomware.exe"]:
             reasons.append("Ransomware executable name")
-        if proc_name.lower() in ["keylogger.exe", "stealer.exe"]:
-            reasons.append("Malware executable name")
-        if "suspicious" in proc_name.lower():
+        if proc_lower in ["keylogger.exe", "stealer.exe", "logger.exe"]:
+            reasons.append("Keylogger/Stealer detected")
+        
+        rat_names = ["rat.exe", "njrat.exe", "darkcomet.exe", "cybergate.exe", 
+                     "poison.exe", "blackshades.exe", "remcos.exe", "asyncrat.exe"]
+        if proc_lower in rat_names:
+            reasons.append("Known RAT (Remote Access Trojan)")
+        
+        # Pattern matching
+        if "suspicious" in proc_lower:
             reasons.append("Suspicious name pattern")
-        if "powershell" in proc_name.lower() and "-enc" in cmdline.lower():
+        if "hack" in proc_lower or "crack" in proc_lower:
+            reasons.append("Hacking tool indicator")
+        if "backdoor" in proc_lower or "trojan" in proc_lower:
+            reasons.append("Trojan/Backdoor indicator")
+        
+        # Command line checks
+        if "powershell" in proc_lower and "-enc" in cmd_lower:
             reasons.append("Encoded PowerShell command")
+        if "cmd" in proc_lower and ("&" in cmd_lower or "|" in cmd_lower):
+            reasons.append("Suspicious command chaining")
         
         return reasons if reasons else ["Heuristic analysis"]
     
@@ -165,36 +207,22 @@ class SimpleMultiAgent:
         
         return {'threat_score': 0, 'is_known_malware': False}
     
+    def _analyze_behavior(self, pid: int, proc_name: str, path: str, cmdline: str) -> Dict:
+        """Analyze process behavior"""
+        try:
+            from tools.behavior_monitor import BehaviorMonitor
+            monitor = BehaviorMonitor()
+            return monitor.analyze_process_behavior(pid, proc_name, path, cmdline)
+        except:
+            return {'behaviors': [], 'behavior_threat_score': 0, 'is_suspicious': False}
+    
     def _ai_analysis(self, detection: Dict, intelligence: Dict) -> Dict:
         """AI analysis with Gemini first, OpenAI backup, rule-based fallback"""
         threat_level = detection.get('threat_level', 0)
         reasons = detection.get('reasons', [])
         vt_score = intelligence.get('threat_score', 0)
         
-        # Try Gemini first
-        if self.gemini_llm:
-            try:
-                print("[AI] Trying Gemini API...")
-                from langchain_core.messages import HumanMessage
-                prompt = f"""Analyze this security threat in 2 sentences:
-Process: {detection.get('process_name')}
-Threat Level: {threat_level}/10
-Reasons: {', '.join(reasons)}
-VirusTotal Score: {vt_score}/10
-
-Explain: threat type, risk level, action needed."""
-                
-                message = HumanMessage(content=prompt)
-                response = self.gemini_llm.invoke([message])
-                summary = response.content
-                severity = self._extract_severity(summary, threat_level)
-                print("[OK] Gemini success")
-                
-                return {'summary': summary, 'severity': severity, 'ai_used': 'Gemini'}
-            except Exception as e:
-                print(f"[WARN] Gemini failed: {str(e)[:100]}")
-        
-        # Try OpenAI as backup
+        # Try OpenAI
         if self.openai_llm:
             try:
                 print("[AI] Trying OpenAI API...")
@@ -260,12 +288,16 @@ Explain risk and action."""
         threat_level = detection.get('threat_level', 0)
         severity = analysis.get('severity', 'Low')
         is_known_malware = intelligence.get('is_known_malware', False)
+        behavior_score = intelligence.get('behavior_score', 0)
         
-        if is_known_malware or threat_level >= 8:
+        # Combine threat scores
+        total_threat = threat_level + behavior_score
+        
+        if is_known_malware or total_threat >= 12:
             return 'terminate_permanent'
-        elif threat_level >= 5 or severity == 'High':
+        elif total_threat >= 8 or threat_level >= 5 or severity == 'High':
             return 'terminate_temporary'
-        elif threat_level >= 3:
+        elif total_threat >= 5 or threat_level >= 3:
             return 'monitor'
         else:
             return 'allow'

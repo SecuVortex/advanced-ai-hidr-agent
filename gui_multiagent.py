@@ -163,6 +163,8 @@ class MultiAgentHIDRGui(HIDRGui):
         except Exception:
             pass
         
+        print("[MONITOR] Process monitoring started")
+        
         while self.monitoring_active:
             try:
                 current_processes = {}
@@ -178,14 +180,17 @@ class MultiAgentHIDRGui(HIDRGui):
                 for pid in new_pids:
                     try:
                         proc_info = current_processes[pid]
+                        proc_name = proc_info.get('name', '')
+                        print(f"[MONITOR] New process: {proc_name} (PID: {pid})")
                         self.handle_multiagent_process(proc_info)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        print(f"[MONITOR] Error: {e}")
                 
                 seen_pids = current_pids
                 time.sleep(0.05)
                 
-            except Exception:
+            except Exception as e:
+                print(f"[MONITOR] Loop error: {e}")
                 time.sleep(1)
     
     def handle_multiagent_process(self, proc_info):
@@ -204,19 +209,23 @@ class MultiAgentHIDRGui(HIDRGui):
             
             # ALWAYS run multi-agent for demo (remove this later)
             if is_suspicious or "notepad" in proc_name.lower() or "calc" in proc_name.lower():
-                # Log to agent communication
-                self.log_comm("System", "DetectionAgent", f"Analyzing: {proc_name}")
+                print(f"[DEBUG] Triggering multi-agent for: {proc_name}")
                 
                 # Run multi-agent analysis
                 result = self.orchestrator.analyze_process(proc_name, path, cmdline, pid)
+                print(f"[DEBUG] Got {len(result.get('messages', []))} messages")
                 
                 # Update agent indicators
                 for agent_name, label in self.agent_labels.items():
-                    label.config(foreground="green")
-                    self.root.after(1500, lambda l=label: l.config(foreground="gray"))
+                    try:
+                        label.config(foreground="green")
+                        self.root.after(1500, lambda l=label: l.config(foreground="gray"))
+                    except:
+                        pass
                 
-                # Log all agent messages
+                # Log all agent messages to GUI
                 for msg in result.get('messages', []):
+                    print(f"[DEBUG] Logging: {msg['from_agent']} -> {msg['to_agent']}")
                     self.log_comm(msg['from_agent'], msg['to_agent'], msg['message'])
                 
                 detection = result['detection_result']

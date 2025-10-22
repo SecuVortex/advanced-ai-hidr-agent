@@ -8,6 +8,18 @@ from pathlib import Path
 from typing import Optional
 
 
+def calculate_file_hash(filepath: str, algorithm: str = "sha256") -> Optional[str]:
+    """Calculate file hash (standalone function)"""
+    try:
+        hash_func = getattr(hashlib, algorithm)()
+        with open(filepath, 'rb') as f:
+            for chunk in iter(lambda: f.read(8192), b""):
+                hash_func.update(chunk)
+        return hash_func.hexdigest()
+    except Exception:
+        return None
+
+
 class SecurityTools:
     """Core security operations"""
     
