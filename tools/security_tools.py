@@ -72,6 +72,19 @@ class SecurityTools:
             "malware", "virus", "worm", "rootkit"
         ]
         return any(sus in name_lower for sus in suspicious_names)
+
+    @staticmethod
+    def is_encoded_command(cmdline: str) -> bool:
+        """
+        Check for encoded PowerShell commands
+
+        Args:
+            cmdline: Command line string
+
+        Returns:
+            True if encoded command is detected
+        """
+        return "powershell" in cmdline.lower() and "-enc" in cmdline.lower()
     
     @staticmethod
     def calculate_threat_score(indicators: dict) -> int:
@@ -92,7 +105,7 @@ class SecurityTools:
         
         # Name-based scoring
         if indicators.get("suspicious_name"):
-            score += 3
+            score += 5
         
         # Behavior-based scoring
         if indicators.get("encoded_command"):

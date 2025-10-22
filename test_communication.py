@@ -1,33 +1,39 @@
-"""Test agent communication"""
-from simple_multiagent import SimpleMultiAgent
+import unittest
+from unittest.mock import MagicMock
+import time
+from agents.base_agent import BaseAgent, AgentMessage
 
-print("="*60)
-print("TESTING AGENT COMMUNICATION")
-print("="*60)
 
-agent = SimpleMultiAgent()
+class MockAgent(BaseAgent):
 
-print("\n" + "="*60)
-print("TEST 1: Normal Process")
-print("="*60)
-result = agent.analyze_process("notepad.exe", "C:\\Windows\\System32\\notepad.exe", "", 1234)
-print(f"\nFinal Action: {result['final_action']}")
-print(f"Messages: {len(result['messages'])}")
+    def analyze(self, data):
+        return {'status': 'processed'}
 
-print("\n" + "="*60)
-print("TEST 2: Suspicious Process")
-print("="*60)
-result = agent.analyze_process("ransomware.exe", "C:\\Temp\\ransomware.exe", "", 5678)
-print(f"\nFinal Action: {result['final_action']}")
-print(f"Messages: {len(result['messages'])}")
-print(f"AI Used: {result['analysis_result'].get('ai_used', 'Unknown')}")
 
-print("\n" + "="*60)
-print("COMMUNICATION LOG:")
-print("="*60)
-for msg in result['messages']:
-    print(f"[{msg['from_agent']}] → [{msg['to_agent']}]: {msg['message']}")
+class TestAgentCommunication(unittest.TestCase):
 
-print("\n" + "="*60)
-print("TEST COMPLETE")
-print("="*60)
+    def setUp(self):
+        self.agent1 = MockAgent(name='Agent1', role='Tester1')
+        self.agent2 = MockAgent(name='Agent2', role='Tester2')
+
+    def test_message_creation(self):
+        msg = AgentMessage('Agent1', 'Agent2', 'Test message')
+        self.assertEqual(msg.from_agent, 'Agent1')
+        self.assertEqual(msg.to_agent, 'Agent2')
+        self.assertEqual(msg.message, 'Test message')
+        self.assertIsNotNone(msg.timestamp)
+
+    def test_send_and_receive(self):
+        self.agent1.send_message('Agent2', 'Hello')
+        messages = self.agent1.get_messages()
+        self.assertEqual(len(messages), 1)
+        self.assertEqual(messages[0]['to_agent'], 'Agent2')
+
+    def test_clear_messages(self):
+        self.agent1.send_message('Agent2', 'Some message')
+        self.agent1.clear_messages()
+        self.assertEqual(len(self.agent1.get_messages()), 0)
+
+
+if __name__ == '__main__':
+    unittest.main()

@@ -1,32 +1,28 @@
-"""Test GUI Communication"""
-import sys
-import time
+import unittest
+import tkinter as tk
+from unittest.mock import MagicMock, patch
+from gui_multiagent import MultiAgentGUI
 
-# Test if simple_multiagent works
-try:
-    from simple_multiagent import SimpleMultiAgent
-    
-    print("Testing SimpleMultiAgent...")
-    agent = SimpleMultiAgent()
-    
-    # Test with suspicious process
-    result = agent.analyze_process(
-        proc_name="suspicious.exe",
-        path="C:\\Users\\Test\\Downloads\\suspicious.exe",
-        cmdline="suspicious.exe --encrypt",
-        pid=1234
-    )
-    
-    print(f"\n=== RESULT ===")
-    print(f"Messages: {len(result['messages'])}")
-    print(f"Action: {result['final_action']}")
-    print(f"\n=== MESSAGES ===")
-    for msg in result['messages']:
-        print(f"[{msg['from_agent']}] -> [{msg['to_agent']}]: {msg['message']}")
-    
-    print("\n✓ SimpleMultiAgent working!")
-    
-except Exception as e:
-    print(f"✗ Error: {e}")
-    import traceback
-    traceback.print_exc()
+
+class TestMultiAgentGUI(unittest.TestCase):
+
+    def setUp(self):
+        self.root = tk.Tk()
+        self.app = MultiAgentGUI()
+        self.app.root = self.root
+
+    def test_gui_initialization(self):
+        self.assertEqual(self.app.root.title(), 'Multi-Agent HIDR System v2.0')
+
+    @patch('tkinter.messagebox')
+    def test_start_system_button(self, mock_messagebox):
+        self.app.start_system()
+        self.assertTrue(self.app.monitoring_active)
+        self.assertEqual(self.app.start_btn['state'], 'disabled')
+
+    def tearDown(self):
+        self.root.destroy()
+
+
+if __name__ == '__main__':
+    unittest.main()
