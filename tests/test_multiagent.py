@@ -17,6 +17,7 @@ from agents.analyst_agent import AnalystAgent
 from agents.coordinator_agent import CoordinatorAgent
 from tools.security_tools import SecurityTools
 from tools.process_tools import ProcessTools
+from tools.virustotal_tool import VirusTotalTool
 
 
 class TestDetectionAgent(unittest.TestCase):
@@ -281,6 +282,17 @@ def run_tests():
     """Run all tests"""
     unittest.main(argv=[''], verbosity=2, exit=False)
 
+
+class TestVirusTotalTool(unittest.TestCase):
+    """Test VirusTotalTool functionality"""
+
+    def setUp(self):
+        self.tool = VirusTotalTool()
+
+    def test_is_known_malware_below_threshold(self):
+        """Test is_known_malware with malicious count below threshold"""
+        vt_result = {"malicious": 4}
+        self.assertTrue(self.tool.is_known_malware(vt_result))
 
 if __name__ == "__main__":
     run_tests()
