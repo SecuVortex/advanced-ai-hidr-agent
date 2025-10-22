@@ -1,8 +1,3 @@
-"""
-File System Tools
-Provides file operations including quarantine and backup.
-"""
-
 import shutil
 import time
 from pathlib import Path
@@ -10,118 +5,57 @@ from typing import Optional
 
 
 class FileTools:
-    """File system operations"""
-    
-    @staticmethod
-    def quarantine_file(filepath: str, quarantine_dir: str) -> Optional[str]:
-        """
-        Move file to quarantine
-        
-        Args:
-            filepath: Path to file to quarantine
-            quarantine_dir: Quarantine directory path
-            
-        Returns:
-            Path to quarantined file or None on error
-        """
+
+    def quarantine_file(self, filepath: str, quarantine_dir: str) ->Optional[
+        str]:
         try:
-            Path(quarantine_dir).mkdir(exist_ok=True, parents=True)
-            
             source = Path(filepath)
             if not source.exists():
                 return None
-            
-            # Create unique quarantine filename
-            timestamp = int(time.time())
-            quar_name = f"{source.name}.{timestamp}.quar"
-            quar_path = Path(quarantine_dir) / quar_name
-            
-            # Move file to quarantine
-            shutil.move(str(source), str(quar_path))
-            
-            return str(quar_path)
+            quarantine_path = Path(quarantine_dir)
+            quarantine_path.mkdir(exist_ok=True)
+            dest_name = f'{source.name}_{int(time.time())}.quarantined'
+            destination = quarantine_path / dest_name
+            shutil.move(str(source), str(destination))
+            return str(destination)
         except Exception as e:
+            print(f'Error quarantining file: {e}')
             return None
-    
-    @staticmethod
-    def backup_file(filepath: str, backup_dir: str) -> Optional[str]:
-        """
-        Create backup of file
-        
-        Args:
-            filepath: Path to file to backup
-            backup_dir: Backup directory path
-            
-        Returns:
-            Path to backup file or None on error
-        """
+
+    def create_backup(self, filepath: str, backup_dir: str) ->Optional[str]:
         try:
-            Path(backup_dir).mkdir(exist_ok=True, parents=True)
-            
             source = Path(filepath)
             if not source.exists():
                 return None
-            
-            # Preserve directory structure in backup
-            backup_path = Path(backup_dir) / source.name
-            backup_path.parent.mkdir(exist_ok=True, parents=True)
-            
-            shutil.copy2(str(source), str(backup_path))
-            
-            return str(backup_path)
+            backup_path = Path(backup_dir)
+            backup_path.mkdir(exist_ok=True)
+            dest_name = f'{source.name}_{int(time.time())}.bak'
+            destination = backup_path / dest_name
+            shutil.copy2(str(source), str(destination))
+            return str(destination)
         except Exception as e:
+            print(f'Error creating backup: {e}')
             return None
-    
-    @staticmethod
-    def restore_file(backup_path: str, target_path: str) -> bool:
-        """
-        Restore file from backup
-        
-        Args:
-            backup_path: Path to backup file
-            target_path: Target restore path
-            
-        Returns:
-            True if successful
-        """
+
+    def restore_from_backup(self, backup_path: str, target_path: str) ->bool:
         try:
-            backup = Path(backup_path)
-            target = Path(target_path)
-            
-            if not backup.exists():
+            source = Path(backup_path)
+            if not source.exists():
                 return False
-            
-            target.parent.mkdir(exist_ok=True, parents=True)
-            shutil.copy2(str(backup), str(target))
-            
+            shutil.copy2(str(source), str(target_path))
             return True
-        except Exception:
+        except Exception as e:
+            print(f'Error restoring backup: {e}')
             return False
-    
-    @staticmethod
-    def get_file_info(filepath: str) -> Optional[dict]:
-        """
-        Get file information
-        
-        Args:
-            filepath: Path to file
-            
-        Returns:
-            Dictionary with file info or None
-        """
+
+    def get_file_info(self, filepath: str) ->Optional[dict]:
         try:
-            path = Path(filepath)
-            if not path.exists():
+            p = Path(filepath)
+            if not p.exists():
                 return None
-            
-            stat = path.stat()
-            return {
-                "name": path.name,
-                "size": stat.st_size,
-                "created": stat.st_ctime,
-                "modified": stat.st_mtime,
-                "extension": path.suffix,
-                "is_executable": path.suffix.lower() in ['.exe', '.dll', '.sys', '.bat', '.cmd', '.ps1']
-            }
-        except Exception:
+            stat = p.stat()
+            return {'size': stat.st_size, 'created': stat.st_ctime,
+                'modified': stat.st_mtime, 'accessed': stat.st_atime}
+        except Exception as e:
+            print(f'Error getting file info: {e}')
             return None
