@@ -153,7 +153,7 @@ class VirusTotalTool:
         score = (malicious * 1.0 + suspicious * 0.5) / total * 10
         return min(score, 10.0)
     
-    def is_known_malware(self, vt_result: Dict[str, Any], threshold: int = 5) -> bool:
+    def is_known_malware(self, vt_result: Dict[str, Any], threshold: int = 1) -> bool:
         """
         Check if file is known malware
         
