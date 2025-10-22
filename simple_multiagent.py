@@ -1,4 +1,4 @@
-import time
+"""import time
 from typing import Dict, Any, Optional
 
 class SimpleMultiAgent:
@@ -167,4 +167,4 @@ if __name__ == "__main__":
     print(f"Action: {result['final_action']}")
     print(f"Detection: {result['detection']}")
     print(f"Intelligence: {result['intelligence']}")
-    print(f"Analysis: {result['analysis']}")
+    print(f"Analysis: {result['analysis']}")   """
