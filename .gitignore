@@ -1,0 +1,76 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# HIDR Agent Specific
+quarantine/*.quar
+backups/
+temp_*/
+incident_report.csv
+reports/*.html
+*.exe
+*.dll
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+
+# Environment and Secrets
+.env
+*.key
+*.pem
+secrets/
+
+# Multi-Agent System
+agents/__pycache__/
+tools/__pycache__/
+core/__pycache__/
+gui/__pycache__/
+utils/__pycache__/
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# IDE
+.vscode/settings.json
+.idea/workspace.xml
