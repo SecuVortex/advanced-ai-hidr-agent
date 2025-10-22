@@ -4,6 +4,3 @@ watchdog>=2.1.9
 win10toast>=0.9
 pywin32>=306
 pefile>=2023.2.7
-requests
-python-dotenv
-langgraph
