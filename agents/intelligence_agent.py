@@ -6,6 +6,7 @@ Queries external threat intelligence sources for reputation and IOC data.
 from typing import Dict, Any
 from agents.base_agent import BaseAgent
 from tools.virustotal_tool import VirusTotalTool
+from core.malwarebazaar_client import MalwareBazaarClient
 
 
 class IntelligenceAgent(BaseAgent):
@@ -14,6 +15,7 @@ class IntelligenceAgent(BaseAgent):
     def __init__(self):
         super().__init__(name="IntelligenceAgent", role="Threat Intelligence Specialist")
         self.vt_tool = VirusTotalTool()
+        self.mb_client = MalwareBazaarClient()
     
     def analyze(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -36,15 +38,16 @@ class IntelligenceAgent(BaseAgent):
         
         return self.enrich_file_analysis(file_hash)
     
-    def enrich_file_analysis(self, file_hash: str) -> Dict[str, Any]:
+    def enrich_file_analysis(self, file_hash: str, threat_level: int = 0) -> Dict[str, Any]:
         """
         Enrich file analysis with threat intelligence
         
         Args:
             file_hash: SHA256 file hash
+            threat_level: Initial threat level (0-10)
             
         Returns:
-            Enriched analysis with VirusTotal data
+            Enriched analysis with VirusTotal and MalwareBazaar data
         """
         self.log_info(f"Querying threat intelligence for hash: {file_hash[:16]}...")
         
@@ -64,6 +67,14 @@ class IntelligenceAgent(BaseAgent):
             "recommendation": self._get_recommendation(threat_score, is_known_malware)
         }
         
+        # Query MalwareBazaar if threat level >= 5
+        if threat_level >= 5:
+            mb_result = self._query_malwarebazaar(file_hash)
+            result['malwarebazaar'] = mb_result
+            if mb_result.get('verdict') == 'malicious':
+                result['is_known_malware'] = True
+                self.log_warning(f"MalwareBazaar: Malware detected - {mb_result.get('malware_family')}")
+        
         if is_known_malware:
             self.log_warning(
                 f"Known malware detected! VT detections: {vt_result.get('malicious', 0)}"
@@ -74,6 +85,31 @@ class IntelligenceAgent(BaseAgent):
             self.log_info(f"Threat score: {threat_score:.1f}/10")
         
         return result
+    
+    def _query_malwarebazaar(self, file_hash: str) -> Dict[str, Any]:
+        """
+        Query MalwareBazaar for malware intelligence
+        
+        Args:
+            file_hash: SHA256 file hash
+            
+        Returns:
+            MalwareBazaar results
+        """
+        try:
+            response = self.mb_client.query_file_hash(file_hash)
+            parsed = self.mb_client.parse_response(response)
+            mb_score = self.mb_client.calculate_threat_score(response)
+            
+            return {
+                'verdict': parsed['verdict'],
+                'malware_family': parsed['malware_family'],
+                'tags': parsed['tags'],
+                'score': mb_score
+            }
+        except Exception as e:
+            self.log_error(f"MalwareBazaar query failed: {e}")
+            return {'verdict': 'unknown', 'malware_family': None, 'tags': [], 'score': 0}
     
     def _get_recommendation(self, threat_score: float, is_known_malware: bool) -> str:
         """

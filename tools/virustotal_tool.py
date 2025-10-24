@@ -7,20 +7,28 @@ Optimized for free tier with caching and rate limiting.
 import requests
 import time
 from typing import Dict, Any, Optional
-from agents.config import Config
+import logging
+
+logger = logging.getLogger('HIDR.VirusTotal')
 
 
 class VirusTotalTool:
     """VirusTotal API integration with free tier optimizations"""
     
     def __init__(self, api_key: Optional[str] = None):
-        self.api_key = api_key or Config.VIRUSTOTAL_API_KEY
+        if api_key is None:
+            try:
+                from agents.config import Config
+                api_key = Config.VIRUSTOTAL_API_KEY
+            except:
+                api_key = ""
+        self.api_key = api_key
         self.base_url = "https://www.virustotal.com/api/v3"
-        self.cache = {}  # Simple cache for repeated queries
+        self.cache = {}
         self.last_request_time = 0
-        self.min_request_interval = 15  # Free tier: 4 requests/minute = 15 sec between requests
+        self.min_request_interval = 15
     
-    def query_file_hash(self, file_hash: str) -> Dict[str, Any]:
+    def query_file_hash(self, file_hash: str, use_resilience: bool = False) -> Dict[str, Any]:
         """
         Query VirusTotal for file hash reputation (with caching for free tier)
         
@@ -40,6 +48,23 @@ class VirusTotalTool:
                 "cached": False
             }
         
+        if use_resilience:
+            try:
+                from core.resilience import resilience
+                return resilience.call_with_resilience(
+                    self._query_internal,
+                    file_hash,
+                    max_attempts=2,
+                    circuit_breaker_name='virustotal'
+                )
+            except Exception as e:
+                logger.error(f"VirusTotal with resilience failed: {e}")
+                return {"error": str(e), "malicious": 0, "suspicious": 0, "harmless": 0, "undetected": 0, "cached": False}
+        
+        return self._query_internal(file_hash)
+    
+    def _query_internal(self, file_hash: str) -> Dict[str, Any]:
+        """Internal query method"""
         # Check cache first
         if file_hash in self.cache:
             cached_result = self.cache[file_hash].copy()
@@ -63,7 +88,7 @@ class VirusTotalTool:
             headers = {"x-apikey": self.api_key}
             
             self.last_request_time = time.time()
-            response = requests.get(url, headers=headers, timeout=Config.API_TIMEOUT)
+            response = requests.get(url, headers=headers, timeout=10)
             
             if response.status_code == 200:
                 data = response.json()

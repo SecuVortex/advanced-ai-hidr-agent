@@ -36,41 +36,41 @@ ENV/
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# HIDR Agent Specific
-quarantine/*.quar
-backups/
-temp_*/
-incident_report.csv
-reports/*.html
-*.exe
-*.dll
-
-# Logs
-*.log
-logs/
-
-# Temporary files
-*.tmp
-*.temp
-
-# Environment and Secrets
+# Environment and Secrets (CRITICAL - Never commit API keys)
 .env
 *.key
 *.pem
 secrets/
 
-# Multi-Agent System
-agents/__pycache__/
-tools/__pycache__/
-core/__pycache__/
-gui/__pycache__/
-utils/__pycache__/
+# HIDR Project Specific
+quarantine/*.quar
+backups/
+temp_*/
+incident_report.csv
+reports/*.html
+reports/*.csv
+reports/*.json
+*.backup
+*.bak
+*.tmp
+*.temp
+
+# Logs
+logs/*.log
+
+# Test files
 .pytest_cache/
 .mypy_cache/
 .coverage
 htmlcov/
+*.cover
 
-# IDE
-.vscode/settings.json
-.idea/workspace.xml
+# Keep directory structure
+!logs/.gitkeep
+!quarantine/.gitkeep
+!reports/.gitkeep
+
+# Documentation builds
+docs/_build/

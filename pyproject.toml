@@ -53,7 +53,7 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "-v --cov=agents --cov=tools --cov=core --cov-report=html --cov-report=term"
+addopts = "-v --tb=short"
 
 [tool.coverage.run]
 source = ["agents", "tools", "core", "utils"]

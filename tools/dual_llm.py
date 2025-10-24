@@ -2,7 +2,6 @@
 Dual LLM System - Load balancing between Gemini and OpenAI
 """
 from typing import Optional, Dict, Any
-from agents.config import Config
 import random
 
 class DualLLM:
@@ -16,20 +15,22 @@ class DualLLM:
     
     def _init_gemini(self):
         try:
+            from agents.config import Config
             if Config.GOOGLE_API_KEY and Config.GOOGLE_API_KEY != "your_google_api_key_here":
                 from langchain_google_genai import ChatGoogleGenerativeAI
                 self.gemini_llm = ChatGoogleGenerativeAI(
-                    model="gemini-2.0-flash-exp",
+                    model="gemini-1.5-flash",
                     google_api_key=Config.GOOGLE_API_KEY,
                     temperature=0.3
                 )
                 self.gemini_available = True
-                print("✓ Gemini API initialized")
+                print("[OK] Gemini API initialized")
         except Exception as e:
-            print(f"⚠️  Gemini init failed: {e}")
+            print(f"[WARN] Gemini init failed: {e}")
     
     def _init_openai(self):
         try:
+            from agents.config import Config
             if Config.OPENAI_API_KEY and Config.OPENAI_API_KEY != "your_openai_api_key_here":
                 from langchain_openai import ChatOpenAI
                 self.openai_llm = ChatOpenAI(
@@ -39,9 +40,9 @@ class DualLLM:
                     max_tokens=800
                 )
                 self.openai_available = True
-                print("✓ OpenAI API initialized")
+                print("[OK] OpenAI API initialized")
         except Exception as e:
-            print(f"⚠️  OpenAI init failed: {e}")
+            print(f"[WARN] OpenAI init failed: {e}")
     
     def invoke(self, prompt: str, prefer_gemini: bool = True) -> Optional[str]:
         """Invoke LLM with load balancing"""

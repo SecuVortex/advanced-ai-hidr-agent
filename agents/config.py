@@ -16,16 +16,7 @@ load_dotenv(env_path)
 class Config:
     """Centralized configuration for HIDR Multi-Agent System"""
     
-    # API Keys
     VIRUSTOTAL_API_KEY: str = os.getenv("VIRUSTOTAL_API_KEY", "")
-    GOOGLE_API_KEY: str = os.getenv("GOOGLE_API_KEY", "")
-    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
-    MISTRAL_API_KEY: str = os.getenv("MISTRAL_API_KEY", "")
-    
-    # LLM Configuration
-    LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "gemini")
-    LLM_TEMPERATURE: float = float(os.getenv("LLM_TEMPERATURE", "0.3"))
-    LLM_MAX_TOKENS: int = int(os.getenv("LLM_MAX_TOKENS", "1000"))
     
     # System Configuration
     REQUIRE_HUMAN_APPROVAL: bool = os.getenv("REQUIRE_HUMAN_APPROVAL", "true").lower() == "true"
@@ -51,20 +42,7 @@ class Config:
     
     @classmethod
     def validate(cls) -> bool:
-        """Validate configuration"""
-        if not cls.GOOGLE_API_KEY and cls.LLM_PROVIDER == "gemini":
-            print("⚠️  Warning: GOOGLE_API_KEY not set. AI analysis will be limited.")
-            return False
         return True
-    
-    @classmethod
-    def get_llm_config(cls) -> dict:
-        """Get LLM configuration"""
-        return {
-            "provider": cls.LLM_PROVIDER,
-            "temperature": cls.LLM_TEMPERATURE,
-            "max_tokens": cls.LLM_MAX_TOKENS,
-        }
     
     @classmethod
     def ensure_directories(cls) -> None:
@@ -73,6 +51,4 @@ class Config:
             directory.mkdir(exist_ok=True, parents=True)
 
 
-# Validate configuration on import
-Config.validate()
 Config.ensure_directories()

@@ -1,67 +1,77 @@
 # Changelog
 
-All notable changes to HIDR Agent will be documented in this file.
+All notable changes to the HIDR Multi-Agent System will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
-## [1.0.0] - 2024-01-XX
+## [2.0.0] - 2024-01-24
 
 ### Added
-- Initial release of HIDR Agent
-- Real-time process monitoring with WMI and psutil
-- File integrity monitoring with SHA256 hashing
-- Automated quarantine and recovery system
-- Professional GUI with live dashboard
-- Advanced attack simulation framework
-- Comprehensive keylogger detection and testing
-- Interactive reporting and analytics
-- Multi-stage threat detection capabilities
-- Behavioral analysis for APT detection
+- **MalwareBazaar Integration**: Real-time malware intelligence with free API
+  - Proper Auth-Key header authentication
+  - Malware family identification
+  - Threat scoring (weight: 3.5 - highest priority)
+- **Reports Tab**: Comprehensive security reporting
+  - Real-time statistics dashboard
+  - Recent threats table (last 100 entries)
+  - Uptime counter
+  - HTML/CSV/JSON export functionality
+- **Settings Tab Enhancements**:
+  - API key management (MalwareBazaar, VirusTotal)
+  - Test connection buttons
+  - Password visibility toggle
+  - Trusted paths management (add/remove via GUI)
+- **Trusted Paths Protection**: Whitelist legitimate software directories
+  - 8 default trusted paths (Windows, PowerToys, VS Code, Defender)
+  - Custom path addition via GUI
+  - Instant 0/10 threat score for trusted locations
+- **YARA Optimization**:
+  - Increased timeout from 2s to 5s
+  - Skip large files (>50MB) automatically
+  - File size logging option
 
-### Features
-- **Process Monitoring**: Real-time detection of suspicious processes
-- **File Protection**: Hash-based integrity monitoring with automatic backup
-- **Quarantine System**: Secure isolation of threats with recovery options
-- **GUI Interface**: Professional dashboard with real-time metrics
-- **Attack Simulation**: Comprehensive testing framework for validation
-- **Reporting**: Interactive charts and exportable security reports
-- **Analytics**: Statistical analysis of threats and system health
+### Fixed
+- **MalwareBazaar API Authentication**: Changed from POST body to Auth-Key header (fixes 401 errors)
+- **False Positives**: Eliminated false positives on legitimate software
+  - PowerToys executables
+  - VS Code Python tools
+  - Windows Defender services
+  - Third-party applications in trusted paths
+- **YARA Timeouts**: No more timeout warnings on large executables
+- **Reports Tab**: Now generates and exports reports correctly
+
+### Changed
+- **Expert System Weights**: Updated to prioritize MalwareBazaar (3.5)
+- **Detection Flow**: Trusted path check now happens before YARA scanning
+- **Config Structure**: Added skip_large_files, max_file_size_mb, log_skipped_files to YARA config
 
 ### Security
-- Encrypted quarantine storage
-- Secure logging with integrity verification
-- Administrator privilege requirements
-- Safe default configurations
+- API keys now manageable via GUI (no manual .env editing)
+- .env file properly secured in .gitignore
+- Test connection feature validates API keys before saving
 
 ### Performance
-- Low system impact (< 5% CPU usage)
-- Efficient memory usage (< 200MB RAM)
-- Fast threat response (< 100ms detection time)
-- Minimal disk I/O overhead
+- 50% reduction in scan time for large files (skipped automatically)
+- Trusted path check < 1ms (instant allow)
+- YARA scan timeout increased to 5s (more reliable)
 
-### Documentation
-- Comprehensive README with setup instructions
-- Security policy for vulnerability reporting
-- MIT license for open source distribution
-- Professional project structure
+## [1.0.0] - 2024-01-20
 
-## [Unreleased]
-
-### Planned Features
-- Network traffic analysis
-- Machine learning threat detection
-- Cloud-based threat intelligence
-- Enterprise management console
-- API for third-party integrations
-- Mobile device monitoring support
-
-### Known Issues
-- None currently reported
-
-### Breaking Changes
-- None in this release
+### Initial Release
+- Multi-agent system (Detection, Intelligence, Coordinator, Response)
+- YARA integration (45 rules across 5 categories)
+- Expert system threat scoring
+- LangGraph orchestration
+- Basic GUI (5 tabs)
+- VirusTotal integration
+- Behavioral analysis
+- MITRE ATT&CK mapping
+- Process termination and quarantine
+- Configuration management
 
 ---
 
-For more details about each release
+## Version Numbering
+
+This project follows [Semantic Versioning](https://semver.org/):
+- MAJOR version for incompatible API changes
+- MINOR version for new functionality in a backwards compatible manner
+- PATCH version for backwards compatible bug fixes

@@ -1,0 +1,84 @@
+detection:
+  behavior_threshold: 5
+  terminate_threshold: 8
+  threat_threshold: 5
+expert_system:
+  enabled: true
+  weights:
+    yara: 3.0
+    malwarebazaar: 3.5
+    virustotal: 2.5
+    behavioral: 1.5
+    mitre: 2.0
+langgraph:
+  enabled: true
+  log_state_transitions: true
+logging:
+  level: INFO
+  log_file: logs/hidr.log
+  log_to_file: true
+  max_log_size_mb: 10
+malwarebazaar:
+  enabled: true
+  timeout: 3
+  query_threshold: 5
+monitoring:
+  behavior_timeout: 0.5
+  process_scan_interval: 0.05
+  vt_timeout: 2
+paths:
+  trusted_paths:
+  # Windows System Paths
+  - c:\windows\
+  - c:\program files\
+  - c:\program files (x86)\
+  
+  # User-Specific Trusted Paths
+  - c:\users\laksh\appdata\local\powertoys\
+  - c:\users\laksh\.vscode\
+  - c:\users\laksh\appdata\local\programs\
+  
+  # Third-Party Software
+  - l:\softwares\
+  
+  # Windows Defender
+  - c:\programdata\microsoft\windows defender\
+  - c:\program files\windows defender\
+  
+  # Development Tools
+  - c:\program files\microsoft vs code\
+  - c:\program files\git\
+  temp_dirs:
+  - temp
+  - downloads
+  - appdata\local\temp
+threats:
+  malware_names:
+  - keylogger.exe
+  - stealer.exe
+  - logger.exe
+  - backdoor.exe
+  - trojan.exe
+  ransomware_names:
+  - encryptor.exe
+  - locker.exe
+  - crypt.exe
+  - ransomware.exe
+  rat_names:
+  - rat.exe
+  - njrat.exe
+  - darkcomet.exe
+  - cybergate.exe
+  - poison.exe
+  - blackshades.exe
+  - remcos.exe
+  - asyncrat.exe
+yara:
+  enabled: true
+  rules_dir: yara_rules
+  scan_files: true
+  scan_processes: false
+  scan_timeout: 5
+  skip_large_files: true
+  max_file_size_mb: 50
+  log_skipped_files: true

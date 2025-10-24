@@ -108,3 +108,9 @@ class SecurityTools:
             score += 1
         
         return min(score, 10)  # Cap at 10
+
+
+# Convenience function for backward compatibility
+def calculate_file_hash(filepath: str, algorithm: str = "sha256") -> Optional[str]:
+    """Convenience wrapper for SecurityTools.calculate_file_hash"""
+    return SecurityTools.calculate_file_hash(filepath, algorithm)
