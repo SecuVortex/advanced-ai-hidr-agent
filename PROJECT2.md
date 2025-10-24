@@ -3,8 +3,7 @@
 **HIDR - Hybrid Intelligent Detection & Response**  
 **Author**: Lakshya Agarwal (SecuVortex)  
 **Module**: 2 - Multi-Agent Systems & Tool Integration  
-**Date**: January 2024  
-**Version**: 2.0.0
+**Date**: October 2025  
 
 ---
 
@@ -638,4 +637,4 @@ This multi-agent system represents my approach to building transparent, educatio
 
 *Demonstrating the power of collaborative AI in defensive security.*
 
-**Lakshya Agarwal (SecuVortex)** | Module 2 Project | January 2024
+**Lakshya Agarwal (SecuVortex)** | Module 2 Project | October 2025
