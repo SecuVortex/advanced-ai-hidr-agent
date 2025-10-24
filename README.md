@@ -5,6 +5,9 @@
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Tests Passing](https://img.shields.io/badge/tests-52%20passing-brightgreen.svg)](tests/)
+[![Module 3](https://img.shields.io/badge/Module%203-Production%20Ready-success.svg)](PROJECT3.md)
+
+> 📚 **Academic Documentation**: For detailed Module 3 compliance and technical specifications, see [PROJECT3.md](PROJECT3.md)
 
 ---
 
@@ -286,6 +289,19 @@ python production_gui.py
   - **Manage Trusted Paths** (Add/Remove custom directories)
   - Enable auto-scan (1-30 minute intervals)
 - **About Tab**: System information, agent status, creator info
+
+---
+
+## 📚 Documentation
+
+HIDR includes comprehensive documentation for different audiences:
+
+- **[README.md](README.md)** - Main documentation (you are here)
+- **[QUICKSTART.md](QUICKSTART.md)** - 5-minute setup guide for new users
+- **[TESTING_GUIDE.md](TESTING_GUIDE.md)** - Complete testing instructions
+- **[PROJECT3.md](PROJECT3.md)** - Academic documentation (Module 3 compliance)
+- **[CHANGELOG.md](CHANGELOG.md)** - Version history and release notes
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Contribution guidelines
 
 ---
 
