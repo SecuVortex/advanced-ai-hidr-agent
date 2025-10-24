@@ -4,7 +4,7 @@
 **Student**: Lakshya Agarwal (SecuVortex)  
 **Project**: Multi-Agent Cybersecurity Threat Detection System  
 **Version**: 2.0.0  
-**Date**: January 2024
+**Date**: October 2025
 
 ---
 
