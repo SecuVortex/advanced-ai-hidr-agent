@@ -1,4 +1,4 @@
-# 🛡️ HIDR - Hybrid Intelligent Detection & Response
+ # 🛡️ HIDR - Hybrid Intelligent Detection & Response
 
 **A defensive cybersecurity tool built for threat detection and automated response**
 
