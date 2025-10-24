@@ -114,8 +114,29 @@ class SettingsTab:
             f.write('\n'.join(env_content) + '\n')
     
     def _create_widgets(self):
+        # Create canvas with scrollbar
+        canvas = tk.Canvas(self.frame, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(self.frame, orient="vertical", command=canvas.yview)
+        scrollable_frame = ttk.Frame(canvas)
+        
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        
+        # Bind mousewheel
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        canvas.bind_all("<MouseWheel>", _on_mousewheel)
+        
         # API Keys
-        api_frame = ttk.LabelFrame(self.frame, text="🔑 API Keys", padding=15)
+        api_frame = ttk.LabelFrame(scrollable_frame, text="🔑 API Keys", padding=15)
         api_frame.pack(fill=tk.X, padx=10, pady=5)
         
         # MalwareBazaar
@@ -137,7 +158,7 @@ class SettingsTab:
         ttk.Label(api_frame, text="Note: API keys are stored in .env file", foreground="gray", font=('Arial', 8)).grid(row=2, column=0, columnspan=4, sticky=tk.W, pady=5)
         
         # Thresholds
-        thresh_frame = ttk.LabelFrame(self.frame, text="Detection Thresholds", padding=20)
+        thresh_frame = ttk.LabelFrame(scrollable_frame, text="Detection Thresholds", padding=20)
         thresh_frame.pack(fill=tk.X, padx=10, pady=10)
         
         ttk.Label(thresh_frame, text="Threat Threshold (0-10):").grid(row=0, column=0, sticky=tk.W, pady=5)
@@ -151,7 +172,7 @@ class SettingsTab:
         ttk.Label(thresh_frame, textvariable=self.terminate_threshold).grid(row=1, column=2)
         
         # Expert System Weights
-        weights_frame = ttk.LabelFrame(self.frame, text="Expert System Weights", padding=20)
+        weights_frame = ttk.LabelFrame(scrollable_frame, text="Expert System Weights", padding=20)
         weights_frame.pack(fill=tk.X, padx=10, pady=10)
         
         weights = self.config.get('expert_system', {}).get('weights', {})
@@ -177,7 +198,7 @@ class SettingsTab:
         ttk.Label(weights_frame, textvariable=self.mitre_weight).grid(row=3, column=2)
         
         # Features
-        features_frame = ttk.LabelFrame(self.frame, text="Features", padding=20)
+        features_frame = ttk.LabelFrame(scrollable_frame, text="Features", padding=20)
         features_frame.pack(fill=tk.X, padx=10, pady=10)
         
         self.yara_enabled = tk.BooleanVar(value=self.config.get('yara', {}).get('enabled', True))
@@ -190,7 +211,7 @@ class SettingsTab:
         ttk.Checkbutton(features_frame, text="Enable LangGraph Orchestration", variable=self.langgraph_enabled).pack(anchor=tk.W, pady=5)
         
         # Trusted Paths
-        paths_frame = ttk.LabelFrame(self.frame, text="Trusted Paths", padding=20)
+        paths_frame = ttk.LabelFrame(scrollable_frame, text="Trusted Paths", padding=20)
         paths_frame.pack(fill=tk.X, padx=10, pady=10)
         
         ttk.Label(paths_frame, text="Processes in these paths are trusted (0 threat):").pack(anchor=tk.W, pady=5)
@@ -219,7 +240,7 @@ class SettingsTab:
         ttk.Button(path_btn_frame, text="Remove Selected", command=self.remove_trusted_path).pack(side=tk.LEFT, padx=5)
         
         # Auto-Scan
-        autoscan_frame = ttk.LabelFrame(self.frame, text="Auto-Scan", padding=20)
+        autoscan_frame = ttk.LabelFrame(scrollable_frame, text="Auto-Scan", padding=20)
         autoscan_frame.pack(fill=tk.X, padx=10, pady=10)
         
         self.autoscan_enabled = tk.BooleanVar(value=False)
@@ -231,7 +252,7 @@ class SettingsTab:
         ttk.Label(autoscan_frame, textvariable=self.scan_interval).pack(anchor=tk.W, padx=20)
         
         # Buttons
-        btn_frame = ttk.Frame(self.frame)
+        btn_frame = ttk.Frame(scrollable_frame)
         btn_frame.pack(fill=tk.X, padx=10, pady=10)
         
         ttk.Button(btn_frame, text="Save Settings", command=self.save_settings).pack(side=tk.LEFT, padx=5)
