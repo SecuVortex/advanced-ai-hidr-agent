@@ -6,6 +6,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Tests Passing](https://img.shields.io/badge/tests-52%20passing-brightgreen.svg)](tests/)
 
+📚 **Academic Documentation**: For detailed Module 2 multi-agent system compliance, see [PROJECT2.md](PROJECT2.md)
+
 ---
 
 ## 📖 The Story Behind HIDR
