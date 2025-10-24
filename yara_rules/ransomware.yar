@@ -138,3 +138,81 @@ rule Ransomware_Network_Encryption_Key {
     condition:
         2 of ($net*) and ($crypt or $key)
 }
+
+rule Ransomware_Ryuk {
+    meta:
+        description = "Ryuk ransomware detection"
+        severity = "critical"
+        mitre = "T1486"
+    strings:
+        $s1 = "UNIQUE_ID_DO_NOT_REMOVE" wide ascii
+        $s2 = "RyukReadMe.txt" nocase
+        $s3 = "Ryuk" nocase
+    condition:
+        any of them
+}
+
+rule Ransomware_Maze {
+    meta:
+        description = "Maze ransomware detection"
+        severity = "critical"
+        mitre = "T1486"
+    strings:
+        $s1 = "DECRYPT-FILES.txt" nocase
+        $s2 = "maze" nocase
+        $s3 = "Your files are encrypted" nocase
+    condition:
+        2 of them
+}
+
+rule Ransomware_Conti {
+    meta:
+        description = "Conti ransomware detection"
+        severity = "critical"
+        mitre = "T1486"
+    strings:
+        $s1 = "CONTI" nocase
+        $s2 = "R3ADM3.txt" nocase
+        $s3 = ".CONTI" nocase
+    condition:
+        any of them
+}
+
+rule Ransomware_Backup_Deletion {
+    meta:
+        description = "Backup deletion behavior"
+        severity = "high"
+        mitre = "T1490"
+    strings:
+        $cmd1 = "wbadmin delete catalog" nocase
+        $cmd2 = "wbadmin delete backup" nocase
+        $cmd3 = "vssadmin resize shadowstorage" nocase
+    condition:
+        any of them
+}
+
+rule Ransomware_LockBit {
+    meta:
+        description = "LockBit ransomware detection"
+        severity = "critical"
+        mitre = "T1486"
+    strings:
+        $s1 = "LockBit" nocase
+        $s2 = "Restore-My-Files.txt" nocase
+        $s3 = ".lockbit" nocase
+    condition:
+        any of them
+}
+
+rule Ransomware_BlackCat {
+    meta:
+        description = "BlackCat/ALPHV ransomware detection"
+        severity = "critical"
+        mitre = "T1486"
+    strings:
+        $s1 = "BlackCat" nocase
+        $s2 = "ALPHV" nocase
+        $s3 = "RECOVER-" nocase
+    condition:
+        any of them
+}

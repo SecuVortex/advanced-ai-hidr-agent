@@ -133,3 +133,95 @@ rule RAT_Data_Exfiltration {
     condition:
         all of ($file*) and any of ($net*)
 }
+
+rule RAT_QuasarRAT {
+    meta:
+        description = "QuasarRAT detection"
+        severity = "critical"
+        mitre = "T1219"
+    strings:
+        $s1 = "Quasar" nocase
+        $s2 = "Client.exe" nocase
+        $s3 = "xRAT" nocase
+    condition:
+        any of them
+}
+
+rule RAT_NetWire {
+    meta:
+        description = "NetWire RAT detection"
+        severity = "critical"
+        mitre = "T1219"
+    strings:
+        $s1 = "NetWire" nocase
+        $s2 = "HostId" wide ascii
+        $s3 = "[Keylogger]" wide ascii
+    condition:
+        any of them
+}
+
+rule RAT_Screen_Capture {
+    meta:
+        description = "Screen capture functionality"
+        severity = "high"
+        mitre = "T1113"
+    strings:
+        $api1 = "BitBlt" nocase
+        $api2 = "GetDIBits" nocase
+        $api3 = "CreateDIBSection" nocase
+        $api4 = "GetDesktopWindow" nocase
+    condition:
+        3 of them
+}
+
+rule RAT_Webcam_Access {
+    meta:
+        description = "Webcam access capabilities"
+        severity = "high"
+        mitre = "T1125"
+    strings:
+        $api1 = "capCreateCaptureWindow" nocase
+        $api2 = "capGetDriverDescription" nocase
+        $api3 = "avicap32.dll" nocase
+    condition:
+        any of them
+}
+
+rule RAT_Audio_Recording {
+    meta:
+        description = "Audio recording capabilities"
+        severity = "high"
+        mitre = "T1123"
+    strings:
+        $api1 = "waveInOpen" nocase
+        $api2 = "waveInStart" nocase
+        $api3 = "waveInAddBuffer" nocase
+    condition:
+        2 of them
+}
+
+rule RAT_CobaltStrike {
+    meta:
+        description = "CobaltStrike beacon detection"
+        severity = "critical"
+        mitre = "T1219"
+    strings:
+        $s1 = "beacon.dll" nocase
+        $s2 = "cobaltstrike" nocase
+        $s3 = "malleable" nocase
+    condition:
+        any of them
+}
+
+rule RAT_Meterpreter {
+    meta:
+        description = "Metasploit Meterpreter detection"
+        severity = "critical"
+        mitre = "T1219"
+    strings:
+        $s1 = "meterpreter" nocase
+        $s2 = "ReflectiveLoader" nocase
+        $s3 = "stdapi_" nocase
+    condition:
+        any of them
+}
