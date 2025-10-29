@@ -17,7 +17,8 @@ class ThreatExpertSystem:
             'malwarebazaar': 3.5,
             'virustotal': 2.5,
             'behavioral': 1.5,
-            'mitre': 2.0
+            'mitre': 2.0,
+            'ml': 2.0
         })
         logger.info(f"Expert system initialized with weights: {self.weights}")
     
@@ -29,10 +30,11 @@ class ThreatExpertSystem:
         behavior_score = intelligence.get('behavior_score', 0)
         mitre_techniques = detection.get('mitre_techniques', [])
         mb_score = intelligence.get('malwarebazaar', {}).get('score', 0)
+        ml_score = intelligence.get('ml', {}).get('score', 0) if isinstance(intelligence.get('ml'), dict) else intelligence.get('ml_score', 0)
         
         # Calculate weighted threat score
         threat_score = self.calculate_threat_score(
-            yara_score, vt_score, behavior_score, len(mitre_techniques), mb_score
+            yara_score, vt_score, behavior_score, len(mitre_techniques), mb_score, ml_score
         )
         
         # Determine severity
@@ -52,20 +54,21 @@ class ThreatExpertSystem:
             'ai_used': 'Expert System'
         }
     
-    def calculate_threat_score(self, yara: float, vt: float, behavior: float, mitre_count: int, mb: float = 0) -> float:
+    def calculate_threat_score(self, yara: float, vt: float, behavior: float, mitre_count: int, mb: float = 0, ml: float = 0) -> float:
         """Calculate weighted threat score (0-10)"""
         score = (
             (yara * self.weights['yara']) +
             (mb * self.weights['malwarebazaar']) +
             (vt * self.weights['virustotal']) +
             (behavior * self.weights['behavioral']) +
-            (mitre_count * self.weights['mitre'])
+            (mitre_count * self.weights['mitre']) +
+            (ml * self.weights['ml'])
         )
         
         # Normalize to 0-10 scale
         max_possible = (10 * self.weights['yara']) + (10 * self.weights['malwarebazaar']) + \
                        (10 * self.weights['virustotal']) + (10 * self.weights['behavioral']) + \
-                       (5 * self.weights['mitre'])
+                       (5 * self.weights['mitre']) + (10 * self.weights['ml'])
         
         normalized = (score / max_possible) * 10 if max_possible > 0 else 0
         return min(round(normalized, 1), 10.0)

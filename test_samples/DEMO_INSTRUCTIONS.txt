@@ -1,0 +1,92 @@
+═══════════════════════════════════════════════════════════════════
+🎥 HIDR DEMO - THREAT DETECTION INSTRUCTIONS
+═══════════════════════════════════════════════════════════════════
+
+EICAR.exe won't run because it's just text, not executable.
+Use these alternatives instead:
+
+═══════════════════════════════════════════════════════════════════
+OPTION 1: Suspicious PowerShell Script (RECOMMENDED)
+═══════════════════════════════════════════════════════════════════
+
+1. Open PowerShell (NOT as Admin)
+2. Run: powershell -File "test_samples\suspicious_script.ps1"
+3. Script will run for 5 minutes (contains suspicious patterns)
+4. In HIDR GUI → Click "Start Scan"
+5. HIDR will detect:
+   - Fileless execution (powershell)
+   - Code injection APIs (VirtualAllocEx, WriteProcessMemory)
+   - Credential dumping keywords (lsass, mimikatz)
+   - Threat Score: 7-8/10
+   - Action: TERMINATE TEMPORARY or MONITOR
+
+═══════════════════════════════════════════════════════════════════
+OPTION 2: Python Test Script
+═══════════════════════════════════════════════════════════════════
+
+1. Run: python test_samples\malware_simulator.py
+2. Script simulates malicious behavior
+3. HIDR will detect suspicious patterns
+4. Threat Score: 6-8/10
+
+═══════════════════════════════════════════════════════════════════
+OPTION 3: Show EICAR Detection Without Running
+═══════════════════════════════════════════════════════════════════
+
+1. Create eicar.txt with EICAR string
+2. In HIDR, use Python console:
+
+   from simple_multiagent import SimpleMultiAgent
+   agent = SimpleMultiAgent()
+   
+   # Manually scan EICAR file
+   result = agent.analyze_process(
+       proc_name='eicar.txt',
+       path='C:\\Temp\\eicar.txt',
+       cmdline='notepad eicar.txt',
+       pid=9999
+   )
+   
+   print(f"Threat: {result['detection_result']['threat_level']}/10")
+   print(f"YARA: {result['detection_result']['yara_matches']}")
+
+3. Show detection in console output
+
+═══════════════════════════════════════════════════════════════════
+OPTION 4: Use Real Malware Sample (ADVANCED - VM ONLY!)
+═══════════════════════════════════════════════════════════════════
+
+⚠️ ONLY IN ISOLATED VIRTUAL MACHINE ⚠️
+
+1. Download sample from MalwareBazaar:
+   https://bazaar.abuse.ch/browse/
+
+2. Password for samples: "infected"
+
+3. Extract in VM only
+
+4. Run HIDR scan
+
+5. HIDR will detect real malware signatures
+
+═══════════════════════════════════════════════════════════════════
+BEST FOR VIDEO DEMO: Option 1 (PowerShell Script)
+═══════════════════════════════════════════════════════════════════
+
+Why?
+✓ Safe to run on real machine
+✓ Shows real detection capabilities
+✓ Demonstrates multiple threat indicators
+✓ Easy to reproduce
+✓ No antivirus interference
+
+Steps for Video:
+1. Show suspicious_script.ps1 in editor (highlight suspicious code)
+2. Run script in PowerShell
+3. Switch to HIDR GUI
+4. Click "Start Scan"
+5. Show detection results with high threat score
+6. Show YARA matches and MITRE techniques
+7. Show action taken (Terminate/Monitor)
+
+═══════════════════════════════════════════════════════════════════

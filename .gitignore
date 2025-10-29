@@ -46,6 +46,7 @@ secrets/
 
 # HIDR Project Specific
 quarantine/*.quar
+quarantine/*.json
 backups/
 temp_*/
 incident_report.csv
@@ -56,6 +57,9 @@ reports/*.json
 *.bak
 *.tmp
 *.temp
+hidr.db
+hidr.db-journal
+test_5_agents.py
 
 # Logs
 logs/*.log

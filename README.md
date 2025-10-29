@@ -85,11 +85,14 @@ HIDR is a multi-agent cybersecurity system that automatically detects and respon
 - Automated reporting
 
 ✅ **Production-Ready GUI**
-- 5-tab interface (Processes, Quarantine, Reports, Settings, About)
+- 6-tab interface (Processes, Quarantine, Reports, Agent Logs, Settings, About)
+- **Real-time Background Monitoring** - Automatic process detection every 5 seconds
+- **Agent Logs Tab** - Live agent activity with color-coded logs
 - **Trusted Paths Management** - Add custom trusted directories
 - Auto-scan capability (configurable intervals)
 - Real-time statistics
 - Export reports (JSON/CSV/HTML)
+- Non-blocking GUI (always responsive)
 
 ---
 
@@ -313,7 +316,7 @@ python -m pytest tests/ --cov=. --cov-report=html
 - **Resilience** (12 tests): Retry, timeout, circuit breaker
 - **YARA Scanner** (8 tests): Rule loading, file scanning
 
-**Total: 52 tests passing**
+**Total: 60 tests passing** (52 original + 8 Phase 1)
 
 ---
 
@@ -434,7 +437,7 @@ VIRUSTOTAL_API_KEY=your_key_here
 
 MIT License
 
-Copyright (c) 2024 Lakshya Agarwal (SecuVortex)
+Copyright (c) 2025 Lakshya Agarwal (SecuVortex)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -485,7 +488,18 @@ My goal is to make cybersecurity less intimidating and more approachable for stu
 
 ## 🔄 Version History
 
-### v2.0.0 (Current) - Production Ready
+### v3.0.0 (October 2025) - Production Release
+- ✅ Background monitoring thread (non-blocking)
+- ✅ Event queue system (thread-safe)
+- ✅ Agent Logs tab (real-time activity)
+- ✅ GUI live updates (500ms refresh)
+- ✅ Automatic process detection
+- ✅ Phase 1 test suite (8 tests)
+- 📄 [Phase 1 Documentation](PHASE1_COMPLETE.md)
+- 📄 [Phase 1 Quick Start](PHASE1_QUICKSTART.md)
+- 📄 [Phase 1 Architecture](PHASE1_ARCHITECTURE.md)
+
+### v2.0.0 (September 2025) - Production Ready
 - ✅ Path-based trust system (no false positives)
 - ✅ Trusted Paths management (GUI + config)
 - ✅ YARA integration (5 rule categories)
@@ -498,7 +512,7 @@ My goal is to make cybersecurity less intimidating and more approachable for stu
 - ✅ Test suite (52 tests)
 - ✅ Complete documentation
 
-### v1.0.0 - Initial Release
+### v1.0.0 (August 2025) - Initial Release
 - Basic multi-agent system
 - Simple detection
 - Command-line interface

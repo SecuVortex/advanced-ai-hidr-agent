@@ -29,6 +29,7 @@ class SimpleMultiAgent:
         self.config = self._load_config(config_path)
         self._init_yara()
         self._init_expert_system()
+        self._init_ml()
         if use_langgraph:
             self._init_langgraph()
         logger.info(f"Multi-Agent System initialized (LangGraph: {use_langgraph})")
@@ -82,6 +83,23 @@ class SimpleMultiAgent:
         except Exception as e:
             logger.warning(f"Expert system initialization failed: {e}")
             self.expert_system = None
+    
+    def _init_ml(self):
+        """Initialize ML components"""
+        try:
+            from ml.feature_extractor import FeatureExtractor
+            from ml.threat_model import ThreatModel
+            from ml.behavioral_analyzer import BehavioralAnalyzer
+            
+            self.feature_extractor = FeatureExtractor()
+            self.threat_model = ThreatModel()
+            self.behavioral_analyzer = BehavioralAnalyzer()
+            logger.info("ML components initialized")
+        except Exception as e:
+            logger.warning(f"ML initialization failed: {e}")
+            self.feature_extractor = None
+            self.threat_model = None
+            self.behavioral_analyzer = None
     
     def _init_langgraph(self):
         try:
@@ -228,7 +246,27 @@ class SimpleMultiAgent:
             }
     
     def _run_intelligence(self, detection: Dict, pid: int, proc_name: str, path: str, cmdline: str) -> Dict:
-        intelligence = {'threat_score': 0, 'is_known_malware': False, 'behaviors': [], 'behavior_score': 0, 'malwarebazaar': {}}
+        intelligence = {'threat_score': 0, 'is_known_malware': False, 'behaviors': [], 'behavior_score': 0, 'malwarebazaar': {}, 'ml_score': 0}
+        
+        # ML prediction
+        if self.feature_extractor and self.threat_model:
+            try:
+                features = self.feature_extractor.extract(pid, proc_name, path, cmdline)
+                ml_prob = self.threat_model.predict(features)
+                intelligence['ml_score'] = ml_prob * 10
+                logger.info(f"ML prediction: {ml_prob:.2f}")
+            except Exception as e:
+                logger.error(f"ML prediction failed: {e}")
+        
+        # Behavioral analysis
+        if self.behavioral_analyzer:
+            try:
+                behavior = self.behavioral_analyzer.analyze(pid, proc_name, path)
+                intelligence['behavior_score'] = behavior['behavior_score'] * 10
+                intelligence['behaviors'] = behavior['patterns']
+                logger.info(f"Behavioral score: {behavior['behavior_score']:.2f}")
+            except Exception as e:
+                logger.error(f"Behavioral analysis failed: {e}")
         
         if not detection.get('is_suspicious', False):
             return intelligence

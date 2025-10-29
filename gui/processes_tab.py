@@ -4,13 +4,15 @@ from tkinter import ttk
 import psutil
 import threading
 import time
+from gui.tooltip import add_tooltip
 
 class ProcessesTab:
-    def __init__(self, parent, multiagent, auto_scanner=None, reports_tab=None):
+    def __init__(self, parent, multiagent, auto_scanner=None, reports_tab=None, database=None):
         self.parent = parent
         self.multiagent = multiagent
         self.auto_scanner = auto_scanner
         self.reports_tab = reports_tab
+        self.database = database
         self.running = False
         self.scan_thread = None
         
@@ -20,15 +22,35 @@ class ProcessesTab:
             self._update_autoscan_status()
     
     def _create_widgets(self):
+        # Canvas with scrollbar
+        canvas = tk.Canvas(self.frame, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(self.frame, orient="vertical", command=canvas.yview)
+        scrollable_frame = ttk.Frame(canvas)
+        
+        scrollable_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas_frame = canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.bind("<Configure>", lambda e: canvas.itemconfig(canvas_frame, width=e.width))
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        canvas.bind("<Enter>", lambda e: canvas.bind_all("<MouseWheel>", _on_mousewheel))
+        canvas.bind("<Leave>", lambda e: canvas.unbind_all("<MouseWheel>"))
+        
         # Control buttons
-        btn_frame = ttk.Frame(self.frame)
+        btn_frame = ttk.Frame(scrollable_frame)
         btn_frame.pack(fill=tk.X, padx=5, pady=5)
         
-        self.start_btn = ttk.Button(btn_frame, text="Start Scan", command=self.start_scan)
+        self.start_btn = ttk.Button(btn_frame, text="⚡ Start Scan", command=self.start_scan)
         self.start_btn.pack(side=tk.LEFT, padx=5)
+        add_tooltip(self.start_btn, "Start scanning all running processes (Ctrl+S)")
         
         self.stop_btn = ttk.Button(btn_frame, text="Stop Scan", command=self.stop_scan, state=tk.DISABLED)
         self.stop_btn.pack(side=tk.LEFT, padx=5)
+        add_tooltip(self.stop_btn, "Stop the current scan")
         
         ttk.Label(btn_frame, text="Status:").pack(side=tk.LEFT, padx=10)
         self.status_label = ttk.Label(btn_frame, text="Idle", foreground="gray")
@@ -39,7 +61,7 @@ class ProcessesTab:
             self.autoscan_label.pack(side=tk.RIGHT, padx=10)
         
         # Process tree
-        tree_frame = ttk.Frame(self.frame)
+        tree_frame = ttk.Frame(scrollable_frame)
         tree_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
         columns = ("PID", "Name", "Path", "Threat", "YARA", "MB", "MITRE", "Action")
@@ -57,7 +79,7 @@ class ProcessesTab:
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
         # Stats
-        stats_frame = ttk.LabelFrame(self.frame, text="Statistics", padding=10)
+        stats_frame = ttk.LabelFrame(scrollable_frame, text="Statistics", padding=10)
         stats_frame.pack(fill=tk.X, padx=5, pady=5)
         
         self.stats_label = ttk.Label(stats_frame, text="Scanned: 0 | Threats: 0 | Quarantined: 0")
@@ -65,18 +87,19 @@ class ProcessesTab:
     
     def start_scan(self):
         self.running = True
-        self.start_btn.config(state=tk.DISABLED)
+        self.start_btn.config(state=tk.DISABLED, text="⏳ Scanning...")
         self.stop_btn.config(state=tk.NORMAL)
-        self.status_label.config(text="Scanning...", foreground="green")
+        self.status_label.config(text="🔍 Scanning processes...", foreground="green")
+        self.tree.delete(*self.tree.get_children())  # Clear previous results
         
         self.scan_thread = threading.Thread(target=self._scan_processes, daemon=True)
         self.scan_thread.start()
     
     def stop_scan(self):
         self.running = False
-        self.start_btn.config(state=tk.NORMAL)
+        self.start_btn.config(state=tk.NORMAL, text="⚡ Start Scan")
         self.stop_btn.config(state=tk.DISABLED)
-        self.status_label.config(text="Stopped", foreground="red")
+        self.status_label.config(text="✓ Scan complete" if self.running == False else "⏹ Stopped", foreground="blue")
     
     def _scan_processes(self):
         scanned = 0
@@ -120,6 +143,9 @@ class ProcessesTab:
                     # Log to reports tab
                     if self.reports_tab:
                         self.reports_tab.log_threat(name, threat, yara_count, action)
+                    # Log to database
+                    if self.database:
+                        self.database.add_threat(name, pid, path, threat, str(detection.get('yara_matches', [])), str(mitre), action)
                 
                 # Execute response action
                 if action in ['terminate_temporary', 'terminate_permanent']:

@@ -4,15 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hidr-agent"
-version = "2.0.0"
+version = "3.0.0"
 description = "Multi-Agent Host Intrusion Detection & Response System"
 readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "MIT"}
 authors = [
-    {name = "Lakshay Agarwal"},
-    {name = "Ayush Gaur"},
-    {name = "Ansh Pratap"}
+    {name = "Lakshya Agarwal (SecuVortex)", email = "secuvortex@gmail.com"}
 ]
 keywords = ["security", "malware", "detection", "edr", "multi-agent", "ai", "cybersecurity"]
 classifiers = [

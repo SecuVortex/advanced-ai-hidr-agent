@@ -24,15 +24,33 @@ class ReportsTab:
         self._create_widgets()
     
     def _create_widgets(self):
+        # Canvas with scrollbar
+        canvas = tk.Canvas(self.frame, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(self.frame, orient="vertical", command=canvas.yview)
+        scrollable_frame = ttk.Frame(canvas)
+        
+        scrollable_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas_frame = canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.bind("<Configure>", lambda e: canvas.itemconfig(canvas_frame, width=e.width))
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        canvas.bind("<Enter>", lambda e: canvas.bind_all("<MouseWheel>", _on_mousewheel))
+        canvas.bind("<Leave>", lambda e: canvas.unbind_all("<MouseWheel>"))
+        
         # Control frame
-        control_frame = ttk.Frame(self.frame)
+        control_frame = ttk.Frame(scrollable_frame)
         control_frame.pack(fill=tk.X, padx=10, pady=5)
         
         ttk.Button(control_frame, text="Refresh Stats", command=self._refresh_stats).pack(side=tk.LEFT, padx=5)
         ttk.Button(control_frame, text="Clear Data", command=self._clear_data).pack(side=tk.LEFT, padx=5)
         
         # Statistics display
-        stats_frame = ttk.LabelFrame(self.frame, text="📈 Summary Statistics", padding=15)
+        stats_frame = ttk.LabelFrame(scrollable_frame, text="📈 Summary Statistics", padding=15)
         stats_frame.pack(fill=tk.X, padx=10, pady=5)
         
         # Create grid of stats (2 columns)
@@ -65,7 +83,7 @@ class ReportsTab:
         self._update_uptime()
         
         # Threats table
-        threats_frame = ttk.LabelFrame(self.frame, text="🔴 Recent Threats", padding=10)
+        threats_frame = ttk.LabelFrame(scrollable_frame, text="🔴 Recent Threats", padding=10)
         threats_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
         
         columns = ("Time", "Process", "Threat", "YARA", "Action")
@@ -83,7 +101,7 @@ class ReportsTab:
         scroll.pack(side=tk.RIGHT, fill=tk.Y)
         
         # Export buttons
-        export_frame = ttk.LabelFrame(self.frame, text="Export Reports", padding=20)
+        export_frame = ttk.LabelFrame(scrollable_frame, text="Export Reports", padding=20)
         export_frame.pack(fill=tk.X, padx=10, pady=10)
         
         ttk.Button(export_frame, text="Export as JSON", command=self.export_json, width=20).pack(side=tk.LEFT, padx=5)
@@ -91,7 +109,7 @@ class ReportsTab:
         ttk.Button(export_frame, text="Export as HTML", command=self.export_html, width=20).pack(side=tk.LEFT, padx=5)
         
         # Recent activity
-        activity_frame = ttk.LabelFrame(self.frame, text="Recent Activity", padding=10)
+        activity_frame = ttk.LabelFrame(scrollable_frame, text="Recent Activity", padding=10)
         activity_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
         self.activity_text = tk.Text(activity_frame, height=10, wrap=tk.WORD)
