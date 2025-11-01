@@ -1,4 +1,4 @@
-# 🛡️ HIDR - Hybrid Intelligent Detection & Response
+
 
 **A defensive cybersecurity tool built for threat detection and automated response**
 
@@ -6,7 +6,10 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Tests Passing](https://img.shields.io/badge/tests-52%20passing-brightgreen.svg)](tests/)
 
+
+
 ---
+ # PDF Preview  [![PDF Preview](https://img.shields.io/badge/PDF-View%20Document-red?logo=adobeacrobatreader)](https://fuchsia-erika-13.tiiny.site/)
 
 ## 📖 The Story Behind HIDR
 
