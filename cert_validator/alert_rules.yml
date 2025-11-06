@@ -1,0 +1,55 @@
+# Prometheus Alert Rules for Certificate Validator
+
+groups:
+  - name: cert_validator_alerts
+    interval: 30s
+    rules:
+      - alert: HighOCSPFailureRate
+        expr: rate(ocsp_requests_total{status="failure"}[5m]) / rate(ocsp_requests_total[5m]) > 0.2
+        for: 5m
+        labels:
+          severity: warning
+          component: cert_validator
+        annotations:
+          summary: "High OCSP failure rate detected"
+          description: "OCSP failure rate is {{ $value | humanizePercentage }} over the last 5 minutes"
+      
+      - alert: RevokedCertificateDetected
+        expr: increase(certs_validated_total{verdict="revoked"}[1m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          component: cert_validator
+        annotations:
+          summary: "Revoked certificate detected"
+          description: "{{ $value }} revoked certificate(s) detected in the last minute"
+      
+      - alert: HighCTMissingRate
+        expr: rate(ct_checks_total{status="missing"}[10m]) / rate(ct_checks_total[10m]) > 0.5
+        for: 10m
+        labels:
+          severity: info
+          component: cert_validator
+        annotations:
+          summary: "High CT missing rate for public TLS"
+          description: "{{ $value | humanizePercentage }} of certificates missing from CT logs"
+      
+      - alert: CertValidatorDown
+        expr: up{job="cert_validator"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: cert_validator
+        annotations:
+          summary: "Certificate validator service is down"
+          description: "The certificate validator service has been down for more than 2 minutes"
+      
+      - alert: HighValidationQueueSize
+        expr: cert_validation_queue_size > 100
+        for: 5m
+        labels:
+          severity: warning
+          component: cert_validator
+        annotations:
+          summary: "High validation queue size"
+          description: "Validation queue has {{ $value }} pending jobs"

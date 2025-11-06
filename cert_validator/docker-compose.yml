@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  cert-validator:
+    build:
+      context: ..
+      dockerfile: cert_validator/Dockerfile
+    container_name: hidr-cert-validator
+    ports:
+      - "8001:8001"
+    environment:
+      - LOG_LEVEL=INFO
+      - CACHE_TTL=86400
+      - MAX_WORKERS=2
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - hidr-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/api/expert/status"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    container_name: hidr-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - hidr-network
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: hidr-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./alert_rules.yml:/etc/prometheus/alert_rules.yml
+      - prometheus-data:/prometheus
+    networks:
+      - hidr-network
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+
+networks:
+  hidr-network:
+    driver: bridge
+
+volumes:
+  redis-data:
+  prometheus-data:

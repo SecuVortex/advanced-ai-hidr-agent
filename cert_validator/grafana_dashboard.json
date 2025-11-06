@@ -1,0 +1,73 @@
+{
+  "dashboard": {
+    "title": "HIDR Certificate Validator",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Certificates Validated",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(certs_validated_total[5m])",
+            "legendFormat": "{{verdict}}"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Revoked Certificates",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(certs_validated_total{verdict=\"revoked\"})"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "OCSP Failure Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(ocsp_requests_total{status=\"failure\"}[5m]) / rate(ocsp_requests_total[5m])"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Cache Hit Rate",
+        "type": "gauge",
+        "targets": [
+          {
+            "expr": "rate(cert_cache_total{status=\"hit\"}[5m]) / rate(cert_cache_total[5m]) * 100"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "CT Missing Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(ct_checks_total{status=\"missing\"}[5m]) / rate(ct_checks_total[5m]) * 100"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Validation Duration (p95)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(cert_validation_duration_seconds_bucket[5m]))"
+          }
+        ]
+      }
+    ],
+    "refresh": "30s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    }
+  }
+}
