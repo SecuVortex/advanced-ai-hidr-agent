@@ -138,38 +138,45 @@ class ProcessesTab:
                 intelligence = result.get('intelligence_result', {})
                 action = result.get('final_action', 'allow')
                 
-                # Get publisher from certificate or file properties
-                cert_validation = intelligence.get('cert_validation', {})
+                # Extract publisher and cert info
                 publisher = "Unknown"
-                cert_display = "-"
+                cert_display = "Unsigned"
                 
+                # Infer publisher from path
+                if path and path != "N/A":
+                    path_lower = path.lower()
+                    if "windows" in path_lower or "system32" in path_lower:
+                        publisher = "Microsoft"
+                        cert_display = "System"
+                    elif "program files\\google" in path_lower:
+                        publisher = "Google"
+                        cert_display = "Signed"
+                    elif "program files\\microsoft" in path_lower or "microsoft vs code" in path_lower:
+                        publisher = "Microsoft"
+                        cert_display = "Signed"
+                    elif "program files" in path_lower:
+                        # Extract publisher from path
+                        try:
+                            parts = path.split("\\")
+                            for i, part in enumerate(parts):
+                                if "program files" in part.lower() and i + 1 < len(parts):
+                                    publisher = parts[i + 1][:20]
+                                    cert_display = "Signed"
+                                    break
+                        except:
+                            pass
+                
+                # Override with actual cert validation if available
+                cert_validation = intelligence.get('cert_validation', {})
                 if cert_validation:
-                    cert_verdict = cert_validation.get('verdict', '-')
+                    cert_verdict = cert_validation.get('verdict', '')
                     if cert_verdict == 'valid':
-                        cert_display = "✓ Signed"
-                        # Extract publisher from cert (simplified)
-                        publisher = "Microsoft" if "microsoft" in path.lower() else "Verified"
+                        cert_display = "✓ Valid"
                     elif cert_verdict == 'revoked':
                         cert_display = "⚠ Revoked"
                         publisher = "REVOKED"
                     elif cert_verdict == 'invalid':
                         cert_display = "✗ Invalid"
-                        publisher = "Invalid"
-                    else:
-                        cert_display = "Unsigned"
-                        publisher = "Unknown"
-                else:
-                    # Infer publisher from path
-                    if "microsoft" in path.lower() or "windows" in path.lower():
-                        publisher = "Microsoft"
-                        cert_display = "System"
-                    elif "program files" in path.lower():
-                        # Extract from path
-                        parts = path.lower().split("\\")
-                        if "program files" in parts:
-                            idx = parts.index("program files") + 1
-                            if idx < len(parts):
-                                publisher = parts[idx].title()[:20]
                 
                 # Get parent process
                 try:
@@ -185,7 +192,8 @@ class ProcessesTab:
                         self.reports_tab.log_threat(name, threat, yara_count, action)
                     # Log to database
                     if self.database:
-                        self.database.add_threat(name, pid, path, threat, str(detection.get('yara_matches', [])), str(mitre), action)
+                        mitre_list = detection.get('mitre_techniques', [])
+                        self.database.add_threat(name, pid, path, threat, str(detection.get('yara_matches', [])), str(mitre_list), action)
                 
                 # Execute response action
                 if action in ['terminate_temporary', 'terminate_permanent']:
@@ -207,7 +215,7 @@ class ProcessesTab:
                         threats_detected=threats,
                         files_quarantined=quarantined,
                         yara_detections=self.reports_tab.stats.get('yara_detections', 0) + (1 if yara_count > 0 else 0),
-                        mb_detections=self.reports_tab.stats.get('mb_detections', 0) + (1 if mb_verdict == 'malicious' else 0),
+                        mb_detections=self.reports_tab.stats.get('mb_detections', 0),
                         actions_taken=self.reports_tab.stats.get('actions_taken', 0) + (1 if action != 'allow' else 0)
                     )
                 
