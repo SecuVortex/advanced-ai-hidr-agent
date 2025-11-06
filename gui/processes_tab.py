@@ -64,12 +64,12 @@ class ProcessesTab:
         tree_frame = ttk.Frame(scrollable_frame)
         tree_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        columns = ("PID", "Name", "Path", "Threat", "YARA", "MB", "MITRE", "Action")
+        columns = ("PID", "Name", "Path", "Threat", "YARA", "MB", "Cert", "MITRE", "Action")
         self.tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=15)
         
         for col in columns:
             self.tree.heading(col, text=col)
-            width = 80 if col in ["PID", "Threat", "YARA", "MB"] else 150 if col in ["MITRE", "Action"] else 180
+            width = 80 if col in ["PID", "Threat", "YARA", "MB", "Cert"] else 150 if col in ["MITRE", "Action"] else 180
             self.tree.column(col, width=width)
         
         scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.tree.yview)
@@ -138,6 +138,20 @@ class ProcessesTab:
                 mitre = ', '.join(detection.get('mitre_techniques', [])[:2])
                 action = result.get('final_action', 'allow')
                 
+                # Certificate validation display
+                cert_validation = intelligence.get('cert_validation', {})
+                cert_verdict = cert_validation.get('verdict', '-')
+                if cert_verdict == 'valid':
+                    cert_display = "✓ Valid"
+                elif cert_verdict == 'revoked':
+                    cert_display = "⚠ Revoked"
+                elif cert_verdict == 'invalid':
+                    cert_display = "✗ Invalid"
+                elif cert_verdict == 'no_cert':
+                    cert_display = "- Unsigned"
+                else:
+                    cert_display = "-"
+                
                 if threat >= 5:
                     threats += 1
                     # Log to reports tab
@@ -154,7 +168,7 @@ class ProcessesTab:
                 
                 self.tree.insert('', 0, values=(
                     pid, name[:30], path[:35], f"{threat}/10",
-                    yara_count, mb_display, mitre or "-", action
+                    yara_count, mb_display, cert_display, mitre or "-", action
                 ))
                 
                 scanned += 1
