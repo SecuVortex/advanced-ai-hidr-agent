@@ -6,6 +6,9 @@ python-dotenv>=1.0.0
 pyyaml>=6.0
 requests>=2.31.0
 
+# GUI
+PyQt6>=6.6.0
+
 # YARA
 yara-python>=4.3.1
 
