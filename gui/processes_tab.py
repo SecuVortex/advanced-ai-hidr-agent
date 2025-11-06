@@ -50,7 +50,8 @@ class ProcessesTab:
         self.search_var = tk.StringVar()
         search_entry = ttk.Entry(top_frame, textvariable=self.search_var, width=30)
         search_entry.pack(side=tk.LEFT, padx=(0, 8))
-        add_tooltip(search_entry, "Filter processes by name or PID")
+        search_entry.bind('<KeyRelease>', lambda e: self._apply_filter())
+        add_tooltip(search_entry, "Filter processes by name or PID (live search)")
 
         ttk.Button(top_frame, text="Clear", command=self._clear_filter).pack(side=tk.LEFT, padx=(0, 8))
 
@@ -112,6 +113,9 @@ class ProcessesTab:
 
         # Bind double-click to show details
         self.tree.bind('<Double-Button-1>', self._show_process_details)
+        
+        # Bind right-click for context menu
+        self.tree.bind('<Button-3>', self._show_context_menu)
 
         # Stats
         stats_frame = ttk.LabelFrame(scrollable_frame, text="Statistics", padding=10)
@@ -156,7 +160,36 @@ class ProcessesTab:
 
     def _clear_filter(self):
         self.search_var.set("")
-        # Note: we don't re-run the scan; just clear the filter input
+        self._apply_filter()
+    
+    def _apply_filter(self):
+        """Filter tree view based on search term"""
+        search_term = self.search_var.get().lower()
+        if not search_term:
+            # Show all items
+            for item in self.tree.get_children():
+                self.tree.reattach(item, '', 0)
+            return
+        
+        # Hide items that don't match
+        for item in self.tree.get_children():
+            values = self.tree.item(item)['values']
+            if not values:
+                continue
+            
+            # Search in PID, Name, Publisher, Parent
+            pid_str = str(values[0])
+            name_str = str(values[1]).lower()
+            publisher_str = str(values[2]).lower()
+            parent_str = str(values[3]).lower()
+            
+            if (search_term in pid_str or 
+                search_term in name_str or 
+                search_term in publisher_str or 
+                search_term in parent_str):
+                self.tree.reattach(item, '', 0)
+            else:
+                self.tree.detach(item)
 
     def start_scan(self):
         if self.running:
@@ -438,14 +471,13 @@ class ProcessesTab:
             self.frame.after(10000, self._update_autoscan_status)
 
     def _show_process_details(self, event):
-        """Show detailed process information (runs on main thread)"""
+        """Show detailed process information with ML/confidence breakdown"""
         selection = self.tree.selection()
         if not selection:
             return
 
         item = self.tree.item(selection[0])
         values = item['values']
-
         if not values:
             return
 
@@ -473,25 +505,38 @@ class ProcessesTab:
             username = "N/A"
             start_time = "N/A"
 
+        # Re-analyze to get full results
+        try:
+            result = self.multiagent.analyze_process(name, path, cmdline, pid)
+            detection = result.get('detection_result', {})
+            intelligence = result.get('intelligence_result', {})
+            analysis = result.get('analysis_result', {})
+        except Exception:
+            detection = {}
+            intelligence = {}
+            analysis = {}
+
         # Create detail window
         detail_window = tk.Toplevel(self.frame)
         detail_window.title(f"Process Details - {name}")
-        detail_window.geometry("700x500")
+        detail_window.geometry("800x600")
 
-        # Create text widget with scrollbar
-        text_frame = ttk.Frame(detail_window)
-        text_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        # Create notebook for tabs
+        notebook = ttk.Notebook(detail_window)
+        notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
-        text = tk.Text(text_frame, wrap=tk.WORD, font=('Consolas', 10))
-        scrollbar = ttk.Scrollbar(text_frame, command=text.yview)
-        text.configure(yscrollcommand=scrollbar.set)
+        # Tab 1: Summary
+        summary_frame = ttk.Frame(notebook)
+        notebook.add(summary_frame, text="Summary")
+        
+        summary_text = tk.Text(summary_frame, wrap=tk.WORD, font=('Consolas', 10))
+        summary_scroll = ttk.Scrollbar(summary_frame, command=summary_text.yview)
+        summary_text.configure(yscrollcommand=summary_scroll.set)
+        summary_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        summary_scroll.pack(side=tk.RIGHT, fill=tk.Y)
 
-        text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-
-        # Add process information
-        info = f"""PROCESS DETAILS
-{'='*60}
+        summary_info = f"""PROCESS SUMMARY
+{'='*70}
 
 BASIC INFORMATION:
   Process Name: {name}
@@ -510,40 +555,264 @@ THREAT ANALYSIS:
   YARA Matches: {yara}
   Certificate: {cert}
   Action Taken: {action}
-
-WHY IS THIS RUNNING?
-{'='*60}
+  Severity: {analysis.get('severity', 'N/A')}
 """
+        summary_text.insert('1.0', summary_info)
+        summary_text.config(state=tk.DISABLED)
 
-        # Add reason based on analysis
-        try:
-            try:
-                threat_score_val = int(str(threat).split('/')[0])
-            except Exception:
-                threat_score_val = 0
+        # Tab 2: ML & Confidence
+        ml_frame = ttk.Frame(notebook)
+        notebook.add(ml_frame, text="ML & Confidence")
+        
+        ml_text = tk.Text(ml_frame, wrap=tk.WORD, font=('Consolas', 10))
+        ml_scroll = ttk.Scrollbar(ml_frame, command=ml_text.yview)
+        ml_text.configure(yscrollcommand=ml_scroll.set)
+        ml_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        ml_scroll.pack(side=tk.RIGHT, fill=tk.Y)
 
-            if "System" in cert or "Microsoft" in publisher:
-                reason = "This is a Windows system process required for OS operation."
-            elif parent == "explorer.exe":
-                reason = "User launched this application from Windows Explorer."
-            elif parent == "services.exe":
-                reason = "This is a Windows service running in the background."
-            elif "Program Files" in path:
-                reason = f"Installed application from {publisher}. Launched by {parent}."
-            elif threat_score_val >= 5:
-                reason = f"SUSPICIOUS: High threat level detected. Running from untrusted location.\nRecommended action: {action}"
-            else:
-                reason = f"Standard application process. Parent: {parent}"
-        except Exception:
-            reason = "Unable to determine reason."
+        ml_score = intelligence.get('ml_score', 0)
+        behavior_score = intelligence.get('behavior_score', 0)
+        yara_score = detection.get('yara_score', 0)
+        mb_score = intelligence.get('malwarebazaar', {}).get('score', 0)
+        
+        # Get weights from config
+        weights = self.multiagent.config.get('expert_system', {}).get('weights', {})
+        yara_weight = weights.get('yara', 3.0)
+        ml_weight = weights.get('ml', 3.0)
+        behavior_weight = weights.get('behavioral', 1.5)
+        mb_weight = weights.get('malwarebazaar', 3.5)
 
-        info += f"\n{reason}\n"
+        ml_info = f"""ML & BEHAVIORAL ANALYSIS
+{'='*70}
 
-        text.insert('1.0', info)
-        text.config(state=tk.DISABLED)
+ML PREDICTION:
+  ML Score: {ml_score:.2f}/10
+  Model: {'Heuristic Fallback' if not hasattr(self.multiagent.threat_model, 'model') or self.multiagent.threat_model.model is None else 'Random Forest'}
+  Confidence: {'Low (using heuristics)' if ml_score < 3 else 'Medium' if ml_score < 7 else 'High'}
+
+BEHAVIORAL ANALYSIS:
+  Behavior Score: {behavior_score:.2f}/10
+  Patterns Detected: {len(intelligence.get('behaviors', []))}
+  Behaviors: {', '.join(intelligence.get('behaviors', [])) or 'None'}
+
+CONFIDENCE BREAKDOWN (Weighted Scoring):
+{'='*70}
+  Component          Score    Weight    Contribution
+  {'─'*70}
+  YARA Signatures    {yara_score:5.1f}    {yara_weight:5.1f}     {yara_score * yara_weight:5.1f}
+  ML Prediction      {ml_score:5.1f}    {ml_weight:5.1f}     {ml_score * ml_weight:5.1f}
+  Behavioral         {behavior_score:5.1f}    {behavior_weight:5.1f}     {behavior_score * behavior_weight:5.1f}
+  MalwareBazaar      {mb_score:5.1f}    {mb_weight:5.1f}     {mb_score * mb_weight:5.1f}
+  {'─'*70}
+  TOTAL THREAT SCORE: {analysis.get('threat_score', detection.get('threat_level', 0)):.1f}/10
+
+FALLBACK ANALYSIS:
+  AI Used: {analysis.get('ai_used', 'Expert System')}
+  Reason: {'Using heuristic scoring (no trained model)' if ml_score > 0 and (not hasattr(self.multiagent.threat_model, 'model') or self.multiagent.threat_model.model is None) else 'N/A'}
+"""
+        ml_text.insert('1.0', ml_info)
+        ml_text.config(state=tk.DISABLED)
+
+        # Tab 3: Detection Details
+        detection_frame = ttk.Frame(notebook)
+        notebook.add(detection_frame, text="Detection")
+        
+        detection_text = tk.Text(detection_frame, wrap=tk.WORD, font=('Consolas', 10))
+        detection_scroll = ttk.Scrollbar(detection_frame, command=detection_text.yview)
+        detection_text.configure(yscrollcommand=detection_scroll.set)
+        detection_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        detection_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+
+        yara_matches = detection.get('yara_matches', [])
+        mitre_techniques = detection.get('mitre_techniques', [])
+        reasons = detection.get('reasons', [])
+
+        detection_info = f"""DETECTION DETAILS
+{'='*70}
+
+YARA MATCHES ({len(yara_matches)}):
+"""
+        if yara_matches:
+            for match in yara_matches:
+                detection_info += f"  • {match.get('rule', 'Unknown')} - {match.get('severity', 'N/A')}\n"
+                detection_info += f"    MITRE: {match.get('mitre', 'N/A')}\n"
+        else:
+            detection_info += "  No YARA matches\n"
+
+        detection_info += f"\nMITRE ATT&CK TECHNIQUES ({len(mitre_techniques)}):\n"
+        if mitre_techniques:
+            for technique in mitre_techniques:
+                detection_info += f"  • {technique}\n"
+        else:
+            detection_info += "  No MITRE techniques mapped\n"
+
+        detection_info += f"\nDETECTION REASONS:\n"
+        for reason in reasons:
+            detection_info += f"  • {reason}\n"
+
+        detection_text.insert('1.0', detection_info)
+        detection_text.config(state=tk.DISABLED)
+
+        # Tab 4: Certificate
+        cert_frame = ttk.Frame(notebook)
+        notebook.add(cert_frame, text="Certificate")
+        
+        cert_text = tk.Text(cert_frame, wrap=tk.WORD, font=('Consolas', 10))
+        cert_scroll = ttk.Scrollbar(cert_frame, command=cert_text.yview)
+        cert_text.configure(yscrollcommand=cert_scroll.set)
+        cert_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        cert_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+
+        cert_validation = intelligence.get('cert_validation', {})
+        cert_info = f"""CERTIFICATE VALIDATION
+{'='*70}
+
+STATUS: {cert_validation.get('verdict', 'Not validated').upper()}
+Score: {cert_validation.get('cert_score', 'N/A')}/100
+Chain Length: {cert_validation.get('chain_length', 'N/A')}
+
+ERRORS:
+"""
+        errors = cert_validation.get('errors', [])
+        if errors:
+            for error in errors:
+                cert_info += f"  • {error}\n"
+        else:
+            cert_info += "  No errors\n"
+
+        cert_text.insert('1.0', cert_info)
+        cert_text.config(state=tk.DISABLED)
 
         # Close button
         ttk.Button(detail_window, text="Close", command=detail_window.destroy).pack(pady=10)
 
+    def _show_context_menu(self, event):
+        """Show right-click context menu"""
+        # Select the item under cursor
+        item = self.tree.identify_row(event.y)
+        if item:
+            self.tree.selection_set(item)
+            
+            # Get process info
+            values = self.tree.item(item)['values']
+            if not values:
+                return
+            
+            pid = values[0]
+            name = values[1]
+            threat = values[4]
+            
+            # Create context menu
+            menu = tk.Menu(self.tree, tearoff=0)
+            menu.add_command(label=f"Process: {name} (PID: {pid})", state=tk.DISABLED)
+            menu.add_separator()
+            menu.add_command(label="ℹ View Details", command=lambda: self._show_process_details(event))
+            menu.add_command(label="🔄 Reanalyze", command=lambda: self._reanalyze_process(pid, name))
+            menu.add_separator()
+            menu.add_command(label="⚠ Terminate (Temporary)", command=lambda: self._terminate_process(pid, name, False))
+            menu.add_command(label="🚨 Terminate & Quarantine", command=lambda: self._terminate_process(pid, name, True))
+            menu.add_separator()
+            menu.add_command(label="✅ Add to Whitelist", command=lambda: self._add_to_whitelist(name))
+            
+            # Show menu
+            try:
+                menu.tk_popup(event.x_root, event.y_root)
+            finally:
+                menu.grab_release()
+    
+    def _reanalyze_process(self, pid, name):
+        """Reanalyze a specific process"""
+        try:
+            proc = psutil.Process(int(pid))
+            path = proc.exe()
+            cmdline = ' '.join(proc.cmdline())
+            
+            # Run analysis in background
+            def analyze():
+                try:
+                    result = self.multiagent.analyze_process(name, path, cmdline, pid)
+                    threat = result.get('detection_result', {}).get('threat_level', 0)
+                    action = result.get('final_action', 'allow')
+                    self.ui_queue.put(("set_status", (f"✓ Reanalyzed {name}: {threat}/10 - {action}", "blue")))
+                except Exception as e:
+                    LOG.exception("Reanalysis failed")
+                    self.ui_queue.put(("set_status", (f"✗ Reanalysis failed: {e}", "red")))
+            
+            threading.Thread(target=analyze, daemon=True).start()
+            self.ui_queue.put(("set_status", (f"🔄 Reanalyzing {name}...", "orange")))
+        except Exception as e:
+            LOG.exception("Failed to reanalyze process")
+            self.ui_queue.put(("set_status", (f"✗ Error: {e}", "red")))
+    
+    def _terminate_process(self, pid, name, quarantine=False):
+        """Terminate process with confirmation"""
+        action_text = "terminate and quarantine" if quarantine else "terminate"
+        
+        # Confirmation dialog
+        from tkinter import messagebox
+        confirm = messagebox.askyesno(
+            "Confirm Action",
+            f"Are you sure you want to {action_text} process '{name}' (PID: {pid})?\n\n"
+            f"This action {'CANNOT' if quarantine else 'can'} be undone.",
+            icon='warning'
+        )
+        
+        if not confirm:
+            return
+        
+        try:
+            proc = psutil.Process(int(pid))
+            path = proc.exe()
+            
+            # Get detection info for quarantine metadata
+            detection = {'threat_level': 10, 'yara_matches': [], 'mitre_techniques': []}
+            
+            action = 'terminate_permanent' if quarantine else 'terminate_temporary'
+            success = self._execute_response(action, pid, path, name, detection)
+            
+            if success:
+                self.ui_queue.put(("set_status", (f"✓ {name} {action_text}d successfully", "green")))
+                messagebox.showinfo("Success", f"Process {name} has been {action_text}d.")
+            else:
+                self.ui_queue.put(("set_status", (f"✗ Failed to {action_text} {name}", "red")))
+                messagebox.showerror("Error", f"Failed to {action_text} process. Run as Administrator.")
+        except Exception as e:
+            LOG.exception("Termination failed")
+            self.ui_queue.put(("set_status", (f"✗ Error: {e}", "red")))
+            messagebox.showerror("Error", f"Failed to {action_text} process: {e}")
+    
+    def _add_to_whitelist(self, name):
+        """Add process to whitelist"""
+        import json
+        import os
+        from tkinter import messagebox
+        
+        whitelist_file = 'config/whitelist.json'
+        
+        try:
+            # Load existing whitelist
+            if os.path.exists(whitelist_file):
+                with open(whitelist_file, 'r') as f:
+                    whitelist = json.load(f)
+            else:
+                whitelist = {'processes': []}
+            
+            # Add to whitelist
+            if name not in whitelist.get('processes', []):
+                whitelist.setdefault('processes', []).append(name)
+                
+                # Save whitelist
+                os.makedirs('config', exist_ok=True)
+                with open(whitelist_file, 'w') as f:
+                    json.dump(whitelist, f, indent=2)
+                
+                self.ui_queue.put(("set_status", (f"✓ {name} added to whitelist", "green")))
+                messagebox.showinfo("Success", f"{name} has been added to whitelist.\n\nIt will be ignored in future scans.")
+            else:
+                messagebox.showinfo("Already Whitelisted", f"{name} is already in the whitelist.")
+        except Exception as e:
+            LOG.exception("Failed to add to whitelist")
+            messagebox.showerror("Error", f"Failed to add to whitelist: {e}")
+    
     def get_frame(self):
         return self.frame
