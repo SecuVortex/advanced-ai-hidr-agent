@@ -5,6 +5,7 @@ import time
 import asyncio
 import logging
 import yaml
+import uuid
 from pathlib import Path
 from typing import Dict, Any, Optional
 
@@ -25,14 +26,16 @@ class SimpleMultiAgent:
         self.yara_scanner = None
         self.expert_system = None
         self.langgraph_orchestrator = None
+        self.cert_validator = None
         self.use_langgraph = use_langgraph
         self.config = self._load_config(config_path)
         self._init_yara()
         self._init_expert_system()
         self._init_ml()
+        self._init_cert_validator()
         if use_langgraph:
             self._init_langgraph()
-        logger.info(f"Multi-Agent System initialized (LangGraph: {use_langgraph})")
+        logger.info(f"Multi-Agent System initialized (LangGraph: {use_langgraph}, CertValidator: {self.cert_validator is not None})")
     
     def _load_config(self, config_path: str) -> Dict:
         try:
@@ -101,6 +104,20 @@ class SimpleMultiAgent:
             self.threat_model = None
             self.behavioral_analyzer = None
     
+    def _init_cert_validator(self):
+        """Initialize certificate validator"""
+        if not self.config.get('cert_validator', {}).get('enabled', False):
+            logger.info("Certificate validator disabled in config")
+            return
+        
+        try:
+            from cert_validator.core import CertificateValidator
+            self.cert_validator = CertificateValidator()
+            logger.info("Certificate validator initialized")
+        except Exception as e:
+            logger.warning(f"Certificate validator initialization failed: {e}")
+            self.cert_validator = None
+    
     def _init_langgraph(self):
         try:
             from core.langgraph_wrapper import LangGraphOrchestrator
@@ -123,16 +140,17 @@ class SimpleMultiAgent:
     
     def analyze_process(self, proc_name: str, path: str, cmdline: str, pid: int) -> Dict[str, Any]:
         self.messages = []
+        request_id = str(uuid.uuid4())[:8]
         
         if self.use_langgraph and self.langgraph_orchestrator:
-            logger.info(f"Analyzing process with LangGraph: {proc_name} (PID: {pid})")
+            logger.info(f"[{request_id}] Analyzing process with LangGraph: {proc_name} (PID: {pid})")
             try:
                 return self.langgraph_orchestrator.analyze_process(proc_name, path, cmdline, pid)
             except Exception as e:
                 logger.error(f"LangGraph analysis failed: {e}, falling back to direct")
                 self.use_langgraph = False
         
-        logger.info(f"Analyzing process: {proc_name} (PID: {pid})")
+        logger.info(f"[{request_id}] Analyzing process: {proc_name} (PID: {pid})")
         
         try:
             self.log_message("System", "DetectionAgent", f"Analyzing: {proc_name}")
@@ -142,7 +160,7 @@ class SimpleMultiAgent:
             intelligence = self._run_intelligence(detection, pid, proc_name, path, cmdline)
             
             self.log_message("System", "AnalystAgent", "Generating analysis")
-            analysis = self._run_analysis(detection, intelligence)
+            analysis = self._run_analysis(detection, intelligence, request_id, pid, proc_name, path)
             self.log_message("AnalystAgent", "System", f"Severity: {analysis['severity']}")
             
             self.log_message("System", "CoordinatorAgent", "Determining action")
@@ -153,7 +171,7 @@ class SimpleMultiAgent:
             response = {'action': action, 'success': True}
             self.log_message("ResponseAgent", "System", "Complete")
             
-            logger.info(f"Analysis complete: {proc_name} -> {action}")
+            logger.info(f"[{request_id}] Analysis complete: {proc_name} -> {action} | PID: {pid} | Threat: {detection['threat_level']}/10")
             
             return {
                 'detection_result': detection,
@@ -165,7 +183,7 @@ class SimpleMultiAgent:
             }
         
         except Exception as e:
-            logger.error(f"Analysis failed for {proc_name}: {e}", exc_info=True)
+            logger.error(f"[{request_id}] Analysis failed for {proc_name}: {e} | PID: {pid}", exc_info=True)
             return self._fallback_analysis(proc_name, path, cmdline)
     
     def _is_trusted_path(self, file_path: str) -> bool:
@@ -246,7 +264,20 @@ class SimpleMultiAgent:
             }
     
     def _run_intelligence(self, detection: Dict, pid: int, proc_name: str, path: str, cmdline: str) -> Dict:
-        intelligence = {'threat_score': 0, 'is_known_malware': False, 'behaviors': [], 'behavior_score': 0, 'malwarebazaar': {}, 'ml_score': 0}
+        intelligence = {'threat_score': 0, 'is_known_malware': False, 'behaviors': [], 'behavior_score': 0, 'malwarebazaar': {}, 'ml_score': 0, 'cert_validation': {}}
+        
+        # Certificate validation for PE files
+        if self.cert_validator and path.endswith('.exe'):
+            try:
+                cert_result = self._validate_certificate(path)
+                intelligence['cert_validation'] = cert_result
+                if cert_result.get('verdict') == 'revoked':
+                    intelligence['threat_score'] += 5
+                    logger.warning(f"Revoked certificate detected: {path}")
+                elif cert_result.get('verdict') == 'invalid':
+                    intelligence['threat_score'] += 2
+            except Exception as e:
+                logger.debug(f"Certificate validation failed: {e}")
         
         # ML prediction
         if self.feature_extractor and self.threat_model:
@@ -257,6 +288,7 @@ class SimpleMultiAgent:
                 logger.info(f"ML prediction: {ml_prob:.2f}")
             except Exception as e:
                 logger.error(f"ML prediction failed: {e}")
+                intelligence['ml_score'] = 0  # Safe default
         
         # Behavioral analysis
         if self.behavioral_analyzer:
@@ -348,12 +380,15 @@ class SimpleMultiAgent:
             timeout=timeout
         )
     
-    def _run_analysis(self, detection: Dict, intelligence: Dict) -> Dict:
+    def _run_analysis(self, detection: Dict, intelligence: Dict, request_id: str = None, pid: int = None, proc_name: str = None, path: str = None) -> Dict:
         if self.expert_system:
             try:
                 return self.expert_system.analyze(detection, intelligence)
             except Exception as e:
-                logger.error(f"Expert system failed: {e}")
+                logger.error(
+                    f"[{request_id}] Expert system failed: {e} | "
+                    f"PID: {pid} | Process: {proc_name} | Path: {path}"
+                )
         
         threat_level = detection.get('threat_level', 0)
         reasons = detection.get('reasons', [])
@@ -593,3 +628,24 @@ class SimpleMultiAgent:
             return 'monitor'
         else:
             return 'allow'
+    
+    def _validate_certificate(self, file_path: str) -> Dict:
+        """Validate PE file certificate"""
+        try:
+            from cert_validator.agent_integration import extract_pe_certificate
+            
+            cert_pem = extract_pe_certificate(file_path)
+            if not cert_pem:
+                return {'verdict': 'no_cert', 'cert_score': 50}
+            
+            result = self.cert_validator.validate_chain(cert_pem, intermediates=[], context={'type': 'code_signing'})
+            
+            return {
+                'verdict': result['verdict'],
+                'cert_score': result['cert_score'],
+                'chain_length': result.get('chain_length', 0),
+                'errors': result.get('errors', [])
+            }
+        except Exception as e:
+            logger.debug(f"Certificate validation error: {e}")
+            return {'verdict': 'unknown', 'cert_score': 50, 'errors': [str(e)]}
