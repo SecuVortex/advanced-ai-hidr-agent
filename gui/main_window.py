@@ -78,7 +78,7 @@ class MainWindow(QMainWindow):
         
         # Create tabs
         self.reports_view = ReportsView(self.database)
-        self.processes_view = ProcessesView(self.multiagent, self.database)
+        self.processes_view = ProcessesView(self.multiagent, self.database, self.reports_view)
         self.quarantine_view = QuarantineView()
         self.dashboard_view = DashboardView(self.database)
         self.agent_logs_view = AgentLogsView()

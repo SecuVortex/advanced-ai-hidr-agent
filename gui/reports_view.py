@@ -65,6 +65,12 @@ class ReportsView(QWidget):
         
         self.setLayout(layout)
         self._refresh_stats()
+        
+        # Auto-refresh every 10 seconds
+        from PyQt6.QtCore import QTimer
+        self.timer = QTimer()
+        self.timer.timeout.connect(self._refresh_stats)
+        self.timer.start(10000)
     
     def update_stats(self, **kwargs):
         """Update statistics"""

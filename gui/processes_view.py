@@ -78,6 +78,7 @@ class ScanWorker(QThread):
     """Background thread for process scanning"""
     process_found = pyqtSignal(tuple)
     scan_complete = pyqtSignal(dict)
+    stats_update = pyqtSignal(dict)
     
     def __init__(self, multiagent):
         super().__init__()
@@ -141,6 +142,22 @@ class ScanWorker(QThread):
                     stats['scanned'] += 1
                     if threat >= 5:
                         stats['threats'] += 1
+                    if action in ['terminate_temporary', 'terminate_permanent']:
+                        stats['quarantined'] += 1
+                    
+                    # Log threat to database
+                    if threat >= 5:
+                        try:
+                            from core.database import Database
+                            db = Database()
+                            db.add_threat(name, pid, path, threat, str(detection.get('yara_matches', [])),
+                                        str(detection.get('mitre_techniques', [])), action)
+                        except Exception as e:
+                            logger.debug(f"Failed to log threat: {e}")
+                    
+                    # Emit stats update every 10 processes
+                    if stats['scanned'] % 10 == 0:
+                        self.stats_update.emit(stats.copy())
                     
                     self.msleep(50)  # Throttle
                     
@@ -196,10 +213,11 @@ class ScanWorker(QThread):
 
 class ProcessesView(QWidget):
     """Main processes view widget"""
-    def __init__(self, multiagent, database):
+    def __init__(self, multiagent, database, reports_view=None):
         super().__init__()
         self.multiagent = multiagent
         self.database = database
+        self.reports_view = reports_view
         self.scan_worker = None
         
         self._create_ui()
@@ -260,11 +278,14 @@ class ProcessesView(QWidget):
             return
         
         self.model.clear()
+        self.start_btn.setText("⏳ Scanning...")
         self.start_btn.setEnabled(False)
         self.stop_btn.setEnabled(True)
+        self.stats_label.setText("Scanning: 0 | Threats: 0 | Quarantined: 0")
         
         self.scan_worker = ScanWorker(self.multiagent)
         self.scan_worker.process_found.connect(self._add_process)
+        self.scan_worker.stats_update.connect(self._update_stats)
         self.scan_worker.scan_complete.connect(self._scan_finished)
         self.scan_worker.start()
         
@@ -276,6 +297,7 @@ class ProcessesView(QWidget):
             self.scan_worker.stop()
             self.scan_worker.wait()
         
+        self.start_btn.setText("⚡ Start Scan")
         self.start_btn.setEnabled(True)
         self.stop_btn.setEnabled(False)
         logger.info("Process scan stopped")
@@ -284,8 +306,17 @@ class ProcessesView(QWidget):
         """Add process to table"""
         self.model.add_process(process_data)
     
+    def _update_stats(self, stats):
+        """Update stats during scan"""
+        self.stats_label.setText(
+            f"Scanning: {stats['scanned']} | "
+            f"Threats: {stats['threats']} | "
+            f"Quarantined: {stats['quarantined']}"
+        )
+    
     def _scan_finished(self, stats):
         """Handle scan completion"""
+        self.start_btn.setText("⚡ Start Scan")
         self.start_btn.setEnabled(True)
         self.stop_btn.setEnabled(False)
         
