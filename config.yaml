@@ -1,17 +1,22 @@
 detection:
   behavior_threshold: 5
   terminate_threshold: 8
-  threat_threshold: 4
+  threat_threshold: 5
 expert_system:
   enabled: true
+  escalation:
+    alert_soc: true
+    threshold: 5
+    window_seconds: 60
   weights:
     behavioral: 1.5
     malwarebazaar: 3.5
     mitre: 2.0
+    ml: 2.0
     virustotal: 2.5
     yara: 3.0
 langgraph:
-  enabled: true
+  enabled: false
   log_state_transitions: true
 logging:
   level: INFO
@@ -73,3 +78,8 @@ yara:
   scan_processes: false
   scan_timeout: 5
   skip_large_files: true
+cert_validator:
+  enabled: true
+  api_url: http://localhost:8001
+  api_key: hidr-agent-key-12345
+  timeout: 2
