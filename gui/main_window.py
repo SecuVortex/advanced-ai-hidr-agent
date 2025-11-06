@@ -10,6 +10,10 @@ from gui.processes_view import ProcessesView
 from gui.dashboard_view import DashboardView
 from gui.quarantine_view import QuarantineView
 from gui.settings_view import SettingsView
+from gui.reports_view import ReportsView
+from gui.agent_logs_view import AgentLogsView
+from gui.about_view import AboutView
+from core.event_queue import EventQueue
 
 logger = logging.getLogger('HIDR.MainWindow')
 
@@ -22,6 +26,7 @@ class MainWindow(QMainWindow):
         # Initialize core components
         self.multiagent = SimpleMultiAgent()
         self.database = Database()
+        self.event_queue = EventQueue()
         
         # Setup UI
         self._create_toolbar()
@@ -71,21 +76,26 @@ class MainWindow(QMainWindow):
         self.tabs = QTabWidget()
         self.setCentralWidget(self.tabs)
         
-        # Processes Tab
+        # Create tabs
+        self.reports_view = ReportsView(self.database)
         self.processes_view = ProcessesView(self.multiagent, self.database)
-        self.tabs.addTab(self.processes_view, "🔍 Processes")
-        
-        # Dashboard Tab
-        self.dashboard_view = DashboardView(self.database)
-        self.tabs.addTab(self.dashboard_view, "📊 Dashboard")
-        
-        # Quarantine Tab
         self.quarantine_view = QuarantineView()
-        self.tabs.addTab(self.quarantine_view, "🔒 Quarantine")
-        
-        # Settings Tab
+        self.dashboard_view = DashboardView(self.database)
+        self.agent_logs_view = AgentLogsView()
         self.settings_view = SettingsView()
+        self.about_view = AboutView()
+        
+        # Add tabs
+        self.tabs.addTab(self.processes_view, "🔍 Processes")
+        self.tabs.addTab(self.quarantine_view, "🔒 Quarantine")
+        self.tabs.addTab(self.reports_view, "📊 Reports")
+        self.tabs.addTab(self.dashboard_view, "📈 Dashboard")
+        self.tabs.addTab(self.agent_logs_view, "📋 Agent Logs")
         self.tabs.addTab(self.settings_view, "⚙ Settings")
+        self.tabs.addTab(self.about_view, "ℹ About")
+        
+        # Connect event queue
+        self.agent_logs_view.set_event_queue(self.event_queue)
     
     def _create_statusbar(self):
         """Create status bar"""

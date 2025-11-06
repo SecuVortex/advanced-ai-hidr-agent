@@ -299,8 +299,19 @@ class ProcessesView(QWidget):
     
     def _apply_filter(self):
         """Apply filter to table"""
-        # TODO: Implement proxy model filtering
-        pass
+        filter_text = self.filter_input.text().lower()
+        for row in range(self.model.rowCount()):
+            process = self.model.get_process(row)
+            if not process:
+                continue
+            
+            # Search in PID, Name, Publisher, Parent
+            match = (filter_text in str(process[0]) or
+                    filter_text in str(process[1]).lower() or
+                    filter_text in str(process[2]).lower() or
+                    filter_text in str(process[3]).lower())
+            
+            self.table.setRowHidden(row, not match)
     
     def _show_details(self, index):
         """Show process details dialog"""
@@ -333,10 +344,14 @@ class ProcessesView(QWidget):
         
         if action == details_action:
             self._show_details(index)
+        elif action == reanalyze_action:
+            self._reanalyze_process(index)
         elif action == terminate_action:
             self._terminate_process(index, False)
         elif action == quarantine_action:
             self._terminate_process(index, True)
+        elif action == whitelist_action:
+            self._add_to_whitelist(index)
     
     def _terminate_process(self, index, quarantine=False):
         """Terminate process (simulated mode)"""
@@ -358,20 +373,132 @@ class ProcessesView(QWidget):
         
         logger.info(f"SIMULATED: Terminate {name} (PID: {pid}), quarantine={quarantine}")
     
+    def _reanalyze_process(self, index):
+        """Reanalyze a specific process"""
+        process_data = self.model.get_process(index.row())
+        if not process_data:
+            return
+        
+        pid = process_data[0]
+        name = process_data[1]
+        
+        try:
+            proc = psutil.Process(int(pid))
+            path = proc.exe()
+            cmdline = ' '.join(proc.cmdline())
+            
+            # Reanalyze
+            result = self.multiagent.analyze_process(name, path, cmdline, pid)
+            threat = result.get('detection_result', {}).get('threat_level', 0)
+            action = result.get('final_action', 'allow')
+            
+            QMessageBox.information(
+                self, "Reanalysis Complete",
+                f"Process: {name}\nThreat: {threat}/10\nAction: {action}"
+            )
+            logger.info(f"Reanalyzed {name}: {threat}/10 - {action}")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Reanalysis failed: {e}")
+            logger.error(f"Reanalysis failed: {e}")
+    
+    def _add_to_whitelist(self, index):
+        """Add process to whitelist"""
+        import json
+        import os
+        
+        process_data = self.model.get_process(index.row())
+        if not process_data:
+            return
+        
+        name = process_data[1]
+        whitelist_file = 'config/whitelist.json'
+        
+        try:
+            # Load existing whitelist
+            if os.path.exists(whitelist_file):
+                with open(whitelist_file, 'r') as f:
+                    whitelist = json.load(f)
+            else:
+                whitelist = {'processes': []}
+            
+            # Add to whitelist
+            if name not in whitelist.get('processes', []):
+                whitelist.setdefault('processes', []).append(name)
+                
+                # Save whitelist
+                os.makedirs('config', exist_ok=True)
+                with open(whitelist_file, 'w') as f:
+                    json.dump(whitelist, f, indent=2)
+                
+                QMessageBox.information(
+                    self, "Success",
+                    f"{name} added to whitelist.\n\nIt will be ignored in future scans."
+                )
+                logger.info(f"Added {name} to whitelist")
+            else:
+                QMessageBox.information(self, "Already Whitelisted", f"{name} is already in the whitelist.")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to add to whitelist: {e}")
+            logger.error(f"Whitelist failed: {e}")
+    
     def export_results(self):
         """Export scan results"""
-        # TODO: Implement CSV/JSON export
-        QMessageBox.information(self, "Export", "Export functionality coming soon")
+        from PyQt6.QtWidgets import QFileDialog
+        import csv
+        import json
+        
+        filename, filter_type = QFileDialog.getSaveFileName(
+            self, "Export Results", "", "CSV Files (*.csv);;JSON Files (*.json)"
+        )
+        
+        if not filename:
+            return
+        
+        try:
+            processes = [self.model.get_process(i) for i in range(self.model.rowCount())]
+            
+            if filename.endswith('.csv'):
+                with open(filename, 'w', newline='') as f:
+                    writer = csv.writer(f)
+                    writer.writerow(self.model.headers)
+                    writer.writerows(processes)
+            else:
+                data = [dict(zip(self.model.headers, p)) for p in processes]
+                with open(filename, 'w') as f:
+                    json.dump(data, f, indent=2)
+            
+            QMessageBox.information(self, "Success", f"Exported {len(processes)} processes to {filename}")
+            logger.info(f"Exported {len(processes)} processes to {filename}")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Export failed: {e}")
+            logger.error(f"Export failed: {e}")
 
 class ProcessDetailsDialog(QDialog):
-    """Process details dialog"""
+    """Process details dialog with full analysis"""
     def __init__(self, process_data, multiagent, parent=None):
         super().__init__(parent)
         self.setWindowTitle(f"Process Details - {process_data[1]}")
-        self.setGeometry(200, 200, 800, 600)
+        self.setGeometry(200, 200, 900, 700)
+        
+        pid = process_data[0]
+        name = process_data[1]
+        
+        # Re-analyze to get full data
+        try:
+            proc = psutil.Process(int(pid))
+            path = proc.exe()
+            cmdline = ' '.join(proc.cmdline())
+            result = multiagent.analyze_process(name, path, cmdline, pid)
+            
+            detection = result.get('detection_result', {})
+            intelligence = result.get('intelligence_result', {})
+            analysis = result.get('analysis_result', {})
+        except:
+            detection = {}
+            intelligence = {}
+            analysis = {}
         
         layout = QVBoxLayout()
-        
         tabs = QTabWidget()
         
         # Summary tab
@@ -388,22 +515,99 @@ Threat Level: {process_data[4]}
 YARA Matches: {process_data[5]}
 Certificate: {process_data[6]}
 Action: {process_data[7]}
+Severity: {analysis.get('severity', 'N/A')}
 """)
         tabs.addTab(summary, "Summary")
         
-        # ML tab
+        # ML & Confidence tab
+        ml_score = intelligence.get('ml_score', 0)
+        behavior_score = intelligence.get('behavior_score', 0)
+        yara_score = detection.get('yara_score', 0)
+        mb_score = intelligence.get('malwarebazaar', {}).get('score', 0)
+        
+        weights = multiagent.config.get('expert_system', {}).get('weights', {})
+        yara_weight = weights.get('yara', 3.0)
+        ml_weight = weights.get('ml', 3.0)
+        behavior_weight = weights.get('behavioral', 1.5)
+        mb_weight = weights.get('malwarebazaar', 3.5)
+        
         ml_tab = QTextEdit()
         ml_tab.setReadOnly(True)
-        ml_tab.setText("""ML & BEHAVIORAL ANALYSIS
+        ml_tab.setText(f"""ML & BEHAVIORAL ANALYSIS
 {'='*70}
 
-ML Score: N/A - Model not configured
-Behavioral Score: N/A
-Confidence: N/A
+ML PREDICTION:
+  ML Score: {ml_score:.2f}/10
+  Model: Heuristic Fallback (no trained model)
+  Confidence: {'Low' if ml_score < 3 else 'Medium' if ml_score < 7 else 'High'}
 
-Note: ML model not loaded. Using heuristic fallback.
+BEHAVIORAL ANALYSIS:
+  Behavior Score: {behavior_score:.2f}/10
+  Patterns: {', '.join(intelligence.get('behaviors', [])) or 'None'}
+
+CONFIDENCE BREAKDOWN:
+{'='*70}
+  Component          Score    Weight    Contribution
+  {'─'*70}
+  YARA Signatures    {yara_score:5.1f}    {yara_weight:5.1f}     {yara_score * yara_weight:5.1f}
+  ML Prediction      {ml_score:5.1f}    {ml_weight:5.1f}     {ml_score * ml_weight:5.1f}
+  Behavioral         {behavior_score:5.1f}    {behavior_weight:5.1f}     {behavior_score * behavior_weight:5.1f}
+  MalwareBazaar      {mb_score:5.1f}    {mb_weight:5.1f}     {mb_score * mb_weight:5.1f}
+  {'─'*70}
+  TOTAL: {analysis.get('threat_score', detection.get('threat_level', 0)):.1f}/10
+
+FALLBACK: {analysis.get('ai_used', 'Expert System')}
 """)
         tabs.addTab(ml_tab, "ML & Confidence")
+        
+        # Detection tab
+        yara_matches = detection.get('yara_matches', [])
+        mitre_techniques = detection.get('mitre_techniques', [])
+        reasons = detection.get('reasons', [])
+        
+        detection_tab = QTextEdit()
+        detection_tab.setReadOnly(True)
+        detection_text = f"""DETECTION DETAILS
+{'='*70}
+
+YARA MATCHES ({len(yara_matches)}):
+"""
+        if yara_matches:
+            for match in yara_matches:
+                detection_text += f"  • {match.get('rule', 'Unknown')} - {match.get('severity', 'N/A')}\n"
+                detection_text += f"    MITRE: {match.get('mitre', 'N/A')}\n"
+        else:
+            detection_text += "  No YARA matches\n"
+        
+        detection_text += f"\nMITRE ATT&CK TECHNIQUES ({len(mitre_techniques)}):\n"
+        if mitre_techniques:
+            for technique in mitre_techniques:
+                detection_text += f"  • {technique}\n"
+        else:
+            detection_text += "  No MITRE techniques\n"
+        
+        detection_text += "\nDETECTION REASONS:\n"
+        for reason in reasons:
+            detection_text += f"  • {reason}\n"
+        
+        detection_tab.setText(detection_text)
+        tabs.addTab(detection_tab, "Detection")
+        
+        # Certificate tab
+        cert_validation = intelligence.get('cert_validation', {})
+        cert_tab = QTextEdit()
+        cert_tab.setReadOnly(True)
+        cert_tab.setText(f"""CERTIFICATE VALIDATION
+{'='*70}
+
+Status: {cert_validation.get('verdict', 'Not validated').upper()}
+Score: {cert_validation.get('cert_score', 'N/A')}/100
+Chain Length: {cert_validation.get('chain_length', 'N/A')}
+
+Errors:
+{chr(10).join('  • ' + str(e) for e in cert_validation.get('errors', [])) or '  No errors'}
+""")
+        tabs.addTab(cert_tab, "Certificate")
         
         layout.addWidget(tabs)
         
