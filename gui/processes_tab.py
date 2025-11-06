@@ -64,12 +64,21 @@ class ProcessesTab:
         tree_frame = ttk.Frame(scrollable_frame)
         tree_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        columns = ("PID", "Name", "Path", "Threat", "YARA", "MB", "Cert", "MITRE", "Action")
+        columns = ("PID", "Name", "Publisher", "Parent", "Threat", "YARA", "Cert", "Action")
         self.tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=15)
         
         for col in columns:
             self.tree.heading(col, text=col)
-            width = 80 if col in ["PID", "Threat", "YARA", "MB", "Cert"] else 150 if col in ["MITRE", "Action"] else 180
+            if col == "PID":
+                width = 60
+            elif col in ["Threat", "YARA", "Cert"]:
+                width = 80
+            elif col in ["Action", "Parent"]:
+                width = 120
+            elif col == "Publisher":
+                width = 150
+            else:
+                width = 180
             self.tree.column(col, width=width)
         
         scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.tree.yview)
@@ -77,6 +86,9 @@ class ProcessesTab:
         
         self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Bind double-click to show details
+        self.tree.bind('<Double-Button-1>', self._show_process_details)
         
         # Stats
         stats_frame = ttk.LabelFrame(scrollable_frame, text="Statistics", padding=10)
@@ -123,34 +135,48 @@ class ProcessesTab:
                 
                 threat = detection.get('threat_level', 0)
                 yara_count = len(detection.get('yara_matches', []))
-                
-                # MalwareBazaar verdict
                 intelligence = result.get('intelligence_result', {})
-                mb_data = intelligence.get('malwarebazaar', {})
-                mb_verdict = mb_data.get('verdict', '-')
-                if mb_verdict == 'malicious':
-                    mb_display = f"⚠ {mb_data.get('malware_family', 'Malware')[:15]}"
-                elif mb_verdict == 'clean':
-                    mb_display = "✓ Clean"
-                else:
-                    mb_display = "-"
-                
-                mitre = ', '.join(detection.get('mitre_techniques', [])[:2])
                 action = result.get('final_action', 'allow')
                 
-                # Certificate validation display
+                # Get publisher from certificate or file properties
                 cert_validation = intelligence.get('cert_validation', {})
-                cert_verdict = cert_validation.get('verdict', '-')
-                if cert_verdict == 'valid':
-                    cert_display = "✓ Valid"
-                elif cert_verdict == 'revoked':
-                    cert_display = "⚠ Revoked"
-                elif cert_verdict == 'invalid':
-                    cert_display = "✗ Invalid"
-                elif cert_verdict == 'no_cert':
-                    cert_display = "- Unsigned"
+                publisher = "Unknown"
+                cert_display = "-"
+                
+                if cert_validation:
+                    cert_verdict = cert_validation.get('verdict', '-')
+                    if cert_verdict == 'valid':
+                        cert_display = "✓ Signed"
+                        # Extract publisher from cert (simplified)
+                        publisher = "Microsoft" if "microsoft" in path.lower() else "Verified"
+                    elif cert_verdict == 'revoked':
+                        cert_display = "⚠ Revoked"
+                        publisher = "REVOKED"
+                    elif cert_verdict == 'invalid':
+                        cert_display = "✗ Invalid"
+                        publisher = "Invalid"
+                    else:
+                        cert_display = "Unsigned"
+                        publisher = "Unknown"
                 else:
-                    cert_display = "-"
+                    # Infer publisher from path
+                    if "microsoft" in path.lower() or "windows" in path.lower():
+                        publisher = "Microsoft"
+                        cert_display = "System"
+                    elif "program files" in path.lower():
+                        # Extract from path
+                        parts = path.lower().split("\\")
+                        if "program files" in parts:
+                            idx = parts.index("program files") + 1
+                            if idx < len(parts):
+                                publisher = parts[idx].title()[:20]
+                
+                # Get parent process
+                try:
+                    parent_proc = psutil.Process(pid).parent()
+                    parent_name = parent_proc.name() if parent_proc else "-"
+                except:
+                    parent_name = "-"
                 
                 if threat >= 5:
                     threats += 1
@@ -167,8 +193,8 @@ class ProcessesTab:
                         quarantined += 1
                 
                 self.tree.insert('', 0, values=(
-                    pid, name[:30], path[:35], f"{threat}/10",
-                    yara_count, mb_display, cert_display, mitre or "-", action
+                    pid, name[:30], publisher[:20], parent_name[:15],
+                    f"{threat}/10", yara_count, cert_display, action
                 ))
                 
                 scanned += 1
@@ -288,6 +314,107 @@ class ProcessesTab:
             self.autoscan_label.config(text="Auto-scan: Disabled", foreground="gray")
         
         self.frame.after(10000, self._update_autoscan_status)
+    
+    def _show_process_details(self, event):
+        """Show detailed process information"""
+        selection = self.tree.selection()
+        if not selection:
+            return
+        
+        item = self.tree.item(selection[0])
+        values = item['values']
+        
+        if not values:
+            return
+        
+        pid = values[0]
+        name = values[1]
+        publisher = values[2]
+        parent = values[3]
+        threat = values[4]
+        yara = values[5]
+        cert = values[6]
+        action = values[7]
+        
+        # Get full process info
+        try:
+            proc = psutil.Process(pid)
+            cmdline = ' '.join(proc.cmdline())
+            path = proc.exe()
+            username = proc.username()
+            create_time = proc.create_time()
+            
+            from datetime import datetime
+            start_time = datetime.fromtimestamp(create_time).strftime('%Y-%m-%d %H:%M:%S')
+        except:
+            cmdline = "N/A"
+            path = "N/A"
+            username = "N/A"
+            start_time = "N/A"
+        
+        # Create detail window
+        detail_window = tk.Toplevel(self.frame)
+        detail_window.title(f"Process Details - {name}")
+        detail_window.geometry("700x500")
+        
+        # Create text widget with scrollbar
+        text_frame = ttk.Frame(detail_window)
+        text_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        text = tk.Text(text_frame, wrap=tk.WORD, font=('Consolas', 10))
+        scrollbar = ttk.Scrollbar(text_frame, command=text.yview)
+        text.configure(yscrollcommand=scrollbar.set)
+        
+        text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Add process information
+        info = f"""PROCESS DETAILS
+{'='*60}
+
+BASIC INFORMATION:
+  Process Name: {name}
+  PID: {pid}
+  Publisher: {publisher}
+  Parent Process: {parent}
+  User: {username}
+  Started: {start_time}
+
+LOCATION:
+  Path: {path}
+  Command Line: {cmdline}
+
+THREAT ANALYSIS:
+  Threat Level: {threat}
+  YARA Matches: {yara}
+  Certificate: {cert}
+  Action Taken: {action}
+
+WHY IS THIS RUNNING?
+{'='*60}
+"""
+        
+        # Add reason based on analysis
+        if "System" in cert or "Microsoft" in publisher:
+            reason = "This is a Windows system process required for OS operation."
+        elif parent == "explorer.exe":
+            reason = "User launched this application from Windows Explorer."
+        elif parent == "services.exe":
+            reason = "This is a Windows service running in the background."
+        elif "Program Files" in path:
+            reason = f"Installed application from {publisher}. Launched by {parent}."
+        elif int(threat.split('/')[0]) >= 5:
+            reason = f"SUSPICIOUS: High threat level detected. Running from untrusted location.\nRecommended action: {action}"
+        else:
+            reason = f"Standard application process. Parent: {parent}"
+        
+        info += f"\n{reason}\n"
+        
+        text.insert('1.0', info)
+        text.config(state=tk.DISABLED)
+        
+        # Close button
+        ttk.Button(detail_window, text="Close", command=detail_window.destroy).pack(pady=10)
     
     def get_frame(self):
         return self.frame
