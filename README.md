@@ -55,13 +55,13 @@ HIDR is a multi-agent cybersecurity system that automatically detects and respon
 │         ↓                    ↓                    ↓        │
 │  Trusted Path?        Signature Match      Threat Scoring  │
 │  → Allow              MITRE Mapping        Action Decision │
-│                                                   ↓         │
-│                                            ┌──────────────┐ │
-│                                            │   Response   │ │
-│                                            └──────────────┘ │
-│                                                   ↓         │
-│                                            Quarantine       │
-│                                            Terminate        │
+│                              ↓                    ↓         │
+│                       ┌──────────────┐    ┌──────────────┐ │
+│                       │ Cert Validator│ →  │   Response   │ │
+│                       └──────────────┘    └──────────────┘ │
+│                              ↓                    ↓         │
+│                       OCSP/CRL/CT          Quarantine       │
+│                       Revocation           Terminate        │
 │                                            Monitor          │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -74,6 +74,7 @@ HIDR is a multi-agent cybersecurity system that automatically detects and respon
 - Heuristic analysis
 - Behavioral monitoring
 - VirusTotal integration (optional)
+- **Certificate validation (OCSP/CRL/CT)** - NEW in v3.0
 
 ✅ **Intelligent Analysis**
 - Expert system with weighted scoring
